@@ -36,6 +36,7 @@ export async function updateSession(request: NextRequest) {
     && !request.nextUrl.pathname.startsWith("/terms")
     && !request.nextUrl.pathname.startsWith("/privacy")
     && !request.nextUrl.pathname.startsWith("/invite")
+    && !request.nextUrl.pathname.startsWith("/manifest")
     && !request.nextUrl.pathname.startsWith("/api/webhook")
     && !request.nextUrl.pathname.startsWith("/api/workspaces")
     && !request.nextUrl.pathname.startsWith("/api/invitations")
