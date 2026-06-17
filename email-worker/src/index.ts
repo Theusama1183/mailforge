@@ -59,6 +59,45 @@ export default {
         const rawText = await new Response(message.raw).text();
         console.log(`Raw size: ${rawText.length}`);
 
+        function decodeQP(s: string): string {
+          let out = '';
+          for (let i = 0; i < s.length; i++) {
+            if (s[i] === '=' && i + 2 < s.length && /[0-9A-Fa-f]{2}/.test(s.slice(i+1, i+3))) {
+              out += String.fromCharCode(parseInt(s.slice(i+1, i+3), 16));
+              i += 2;
+            } else if (s[i] === '=' && (s[i+1] === '\n' || (s[i+1] === '\r' && s[i+2] === '\n'))) {
+              // soft line break — skip
+              if (s[i+1] === '\r') i += 2; else i += 1;
+            } else {
+              out += s[i];
+            }
+          }
+          return out;
+        }
+
+        function decodeB64(s: string): string {
+          try {
+            const bin = Uint8Array.from(atob(s.replace(/\s/g, '')), c => c.charCodeAt(0));
+            return new TextDecoder('utf-8', { fatal: false }).decode(bin);
+          } catch { return s; }
+        }
+
+        function decodePart(enc: string, body: string): string {
+          const e = enc.trim().toLowerCase();
+          if (e === 'quoted-printable') return decodeQP(body);
+          if (e === 'base64') return decodeB64(body);
+          return body;
+        }
+
+        // Detect content-type and encoding from headers string
+        function ctMatch(headers: string, type: string): boolean {
+          return /^Content-Type:\s*text\/\w+/im.test(headers) && new RegExp('^Content-Type:\\s*' + type.replace('/', '\\/'), 'im').test(headers);
+        }
+        function getEncoding(headers: string): string {
+          const m = headers.match(/^Content-Transfer-Encoding:\s*(\S+)/im);
+          return m ? m[1].trim() : '7bit';
+        }
+
         const lines = rawText.split(/\r?\n/);
         const boundaryParts: { headers: string; body: string }[] = [];
         let currentHeader = '';
@@ -81,9 +120,13 @@ export default {
               if (bm) topBoundary = bm[1];
             }
             if (line.trim() === '') inTopHeaders = false;
+            if (line.startsWith('Content-Transfer-Encoding')) {
+              // capture top-level content encoding for non-multipart
+            }
             continue;
           }
-          if (topBoundary && line.trim() === '--' + topBoundary) {
+          const trimmed = line.trim();
+          if (topBoundary && (trimmed === '--' + topBoundary)) {
             if (currentHeader) {
               boundaryParts.push({ headers: currentHeader, body: currentBody });
             }
@@ -92,7 +135,7 @@ export default {
             inBody = false;
             continue;
           }
-          if (topBoundary && line.trim() === '--' + topBoundary + '--') {
+          if (topBoundary && (trimmed === '--' + topBoundary + '--')) {
             if (currentHeader) {
               boundaryParts.push({ headers: currentHeader, body: currentBody });
             }
@@ -113,19 +156,17 @@ export default {
 
         if (topBoundary && boundaryParts.length > 0) {
           for (const bp of boundaryParts) {
-            const isTextPlain = /^Content-Type:\s*text\/plain/i.test(bp.headers);
-            const isTextHtml = /^Content-Type:\s*text\/html/i.test(bp.headers);
-            const isQP = /Content-Transfer-Encoding:\s*quoted-printable/i.test(bp.headers);
-            let decoded = bp.body;
-            if (isQP) {
-              decoded = decoded.replace(/=([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
-            }
+            const isTextPlain = /^Content-Type:\s*text\/plain/im.test(bp.headers);
+            const isTextHtml = /^Content-Type:\s*text\/html/im.test(bp.headers);
+            const enc = getEncoding(bp.headers);
+            const decoded = decodePart(enc, bp.body);
             if (isTextPlain && !text) text = decoded;
             if (isTextHtml && !html) html = decoded;
           }
-          text = text || html?.replace(/<[^>]*>/g, '').trim() || 'text/html fallback';
+          text = text || html?.replace(/<[^>]*>/g, '').trim() || '';
         } else {
           let inHeader = true;
+          let bodyLines: string[] = [];
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             if (inHeader) {
@@ -137,10 +178,10 @@ export default {
               }
               if (line.trim() === '') inHeader = false;
             } else {
-              text += (text ? '\n' : '') + line;
+              bodyLines.push(line);
             }
           }
-          text = text?.trim() || '';
+          text = bodyLines.join('\n').trim();
         }
       } catch (parseErr) {
         console.log(`Parse error: ${parseErr.message}`);

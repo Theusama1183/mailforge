@@ -61,6 +61,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       }
     }
 
+    // Assign email addresses to the new member
+    const assignedIds = invitation.assigned_email_ids || []
+    if (Array.isArray(assignedIds) && assignedIds.length > 0) {
+      const { error: assignError } = await admin
+        .from("email_addresses")
+        .update({ assigned_to: user.id })
+        .in("id", assignedIds)
+
+      if (assignError) {
+        console.error("Failed to assign emails:", assignError)
+      }
+    }
+
     // Mark invitation as accepted
     const { error: updateError } = await admin
       .from("invitations")

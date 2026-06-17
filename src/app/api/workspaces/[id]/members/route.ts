@@ -100,3 +100,61 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     return NextResponse.json({ error: "Failed to remove member" }, { status: 500 })
   }
 }
+
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { userId, emailIds } = await req.json()
+    if (!userId || !Array.isArray(emailIds)) {
+      return NextResponse.json({ error: "userId and emailIds array required" }, { status: 400 })
+    }
+
+    // Verify admin
+    const admin = createAdminClient()
+    const { data: membership } = await admin
+      .from("workspace_members")
+      .select("role")
+      .eq("workspace_id", id)
+      .eq("user_id", user.id)
+      .maybeSingle()
+
+    if (!membership || membership.role !== "admin") {
+      return NextResponse.json({ error: "Only admins can assign emails" }, { status: 403 })
+    }
+
+    // First unassign all emails from this user in this workspace
+    const { data: wsEmails } = await admin
+      .from("email_addresses")
+      .select("id")
+      .eq("workspace_id", id)
+      .eq("assigned_to", userId)
+
+    if (wsEmails && wsEmails.length > 0) {
+      await admin
+        .from("email_addresses")
+        .update({ assigned_to: null })
+        .in("id", wsEmails.map(e => e.id))
+    }
+
+    // Assign the selected emails
+    if (emailIds.length > 0) {
+      const { error: assignError } = await admin
+        .from("email_addresses")
+        .update({ assigned_to: userId })
+        .in("id", emailIds)
+        .eq("workspace_id", id)
+
+      if (assignError) {
+        return NextResponse.json({ error: assignError.message }, { status: 500 })
+      }
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to update assignments" }, { status: 500 })
+  }
+}

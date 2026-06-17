@@ -32,7 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { email, message } = await req.json()
+    const { email, message, emailIds } = await req.json()
     if (!email) return NextResponse.json({ error: "Email is required" }, { status: 400 })
 
     const admin = createAdminClient()
@@ -94,6 +94,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         email: email.toLowerCase(),
         token,
         message: message || null,
+        assigned_email_ids: Array.isArray(emailIds) ? emailIds : [],
       })
       .select()
       .single()

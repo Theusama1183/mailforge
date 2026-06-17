@@ -35,14 +35,27 @@ export async function POST(req: Request) {
     let userIds = [userId]
 
     if (emailAddr?.workspace_id) {
-      // Workspace email: insert for all workspace members
-      const { data: members } = await supabase
-        .from("workspace_members")
-        .select("user_id")
-        .eq("workspace_id", emailAddr.workspace_id)
+      // Check if email is assigned to a specific user
+      const { data: assignedEmail } = await supabase
+        .from("email_addresses")
+        .select("assigned_to")
+        .eq("local_part", to.split("@")[0])
+        .not("assigned_to", "is", null)
+        .maybeSingle()
 
-      if (members) {
-        userIds = members.map(m => m.user_id)
+      if (assignedEmail?.assigned_to) {
+        // Only insert for the assigned user
+        userIds = [assignedEmail.assigned_to]
+      } else {
+        // Not assigned to anyone — insert for all workspace members
+        const { data: members } = await supabase
+          .from("workspace_members")
+          .select("user_id")
+          .eq("workspace_id", emailAddr.workspace_id)
+
+        if (members) {
+          userIds = members.map(m => m.user_id)
+        }
       }
     }
 

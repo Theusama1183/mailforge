@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PageHeader } from "@/components/page-header"
-import { Plus, Trash2, Users, Mail, UserPlus, UserMinus, Settings2, Loader2, Clock, CheckCircle, XCircle, Send, MessageSquare, ExternalLink } from "lucide-react"
+import { Plus, Trash2, Users, Mail, UserPlus, UserMinus, Settings2, Loader2, Clock, CheckCircle, XCircle, Send, MessageSquare, ExternalLink, AtSign, Check, Save } from "lucide-react"
 import { toast } from "sonner"
 
 interface Workspace {
@@ -30,8 +30,13 @@ export default function WorkspacesPage() {
   const [newName, setNewName] = useState("")
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteMessage, setInviteMessage] = useState("")
+  const [inviteEmailIds, setInviteEmailIds] = useState<string[]>([])
   const [showCreate, setShowCreate] = useState(false)
   const [sending, setSending] = useState(false)
+  const [workspaceEmails, setWorkspaceEmails] = useState<any[]>([])
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null)
+  const [editingEmailIds, setEditingEmailIds] = useState<string[]>([])
+  const [savingAssign, setSavingAssign] = useState(false)
   const supabase = createClient()
   const router = useRouter()
 
@@ -50,6 +55,7 @@ export default function WorkspacesPage() {
       setSelected(data[0])
       loadMembers(data[0].id)
       loadInvitations(data[0].id)
+      loadWorkspaceEmails(data[0].id)
     }
   }
 
@@ -65,10 +71,22 @@ export default function WorkspacesPage() {
     setInvitations(Array.isArray(data) ? data : [])
   }
 
+  async function loadWorkspaceEmails(wsId: string) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from("email_addresses")
+      .select("id, local_part, domains!inner(domain), assigned_to")
+      .eq("workspace_id", wsId)
+    setWorkspaceEmails(data || [])
+  }
+
   async function selectWorkspace(ws: Workspace) {
     setSelected(ws)
+    setInviteEmailIds([])
     loadMembers(ws.id)
     loadInvitations(ws.id)
+    loadWorkspaceEmails(ws.id)
   }
 
   async function createWorkspace() {
@@ -101,11 +119,12 @@ export default function WorkspacesPage() {
         body: JSON.stringify({
           email: inviteEmail,
           message: inviteMessage.trim() || undefined,
+          emailIds: inviteEmailIds,
         }),
       })
       if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Failed") }
       const data = await res.json()
-      setInviteEmail(""); setInviteMessage("")
+      setInviteEmail(""); setInviteMessage(""); setInviteEmailIds([])
       toast.success(data.email_sent ? "Invitation sent!" : "Invitation created (email not sent — configure SMTP)")
       loadInvitations(selected.id)
     } catch (err) {
@@ -113,6 +132,12 @@ export default function WorkspacesPage() {
     } finally {
       setSending(false)
     }
+  }
+
+  function toggleEmailSelection(emailId: string) {
+    setInviteEmailIds(prev =>
+      prev.includes(emailId) ? prev.filter(id => id !== emailId) : [...prev, emailId]
+    )
   }
 
   async function cancelInvite(inviteId: string) {
@@ -148,6 +173,26 @@ export default function WorkspacesPage() {
       loadWorkspaces()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed")
+    }
+  }
+
+  async function saveAssignments(memberUserId: string) {
+    if (!selected) return
+    setSavingAssign(true)
+    try {
+      const res = await fetch(`/api/workspaces/${selected.id}/members`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: memberUserId, emailIds: editingEmailIds }),
+      })
+      if (!res.ok) throw new Error("Failed")
+      toast.success("Assignments updated")
+      setEditingMemberId(null)
+      loadWorkspaceEmails(selected.id)
+    } catch {
+      toast.error("Failed to update assignments")
+    } finally {
+      setSavingAssign(false)
     }
   }
 
@@ -266,6 +311,46 @@ export default function WorkspacesPage() {
                             placeholder="Add a personal message (optional)"
                             className="text-sm"
                           />
+
+                          {/* Email address assignment */}
+                          {workspaceEmails.length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-1">
+                                <AtSign className="h-3 w-3" />
+                                Assign email addresses (optional)
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {workspaceEmails.map(ea => {
+                                  const alreadyAssigned = ea.assigned_to && !inviteEmailIds.includes(ea.id)
+                                  const selected = inviteEmailIds.includes(ea.id)
+                                  return (
+                                    <button
+                                      key={ea.id}
+                                      type="button"
+                                      disabled={!!alreadyAssigned}
+                                      onClick={() => toggleEmailSelection(ea.id)}
+                                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                                        alreadyAssigned
+                                          ? "bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed"
+                                          : selected
+                                            ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800"
+                                            : "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
+                                      }`}
+                                    >
+                                      {selected && <Check className="h-3 w-3" />}
+                                      {alreadyAssigned && <Check className="h-3 w-3 text-gray-300" />}
+                                      {ea.local_part}@{ea.domains?.domain}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                              {inviteEmailIds.length > 0 && (
+                                <p className="text-[10px] text-blue-500 mt-1">
+                                  {inviteEmailIds.length} email(s) will be assigned upon acceptance
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -314,36 +399,86 @@ export default function WorkspacesPage() {
                         <p className="text-sm text-gray-400">No members yet</p>
                       ) : (
                         <div className="space-y-2">
-                          {members.map(m => (
-                            <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                              <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
-                                  <span className="text-xs font-bold text-white">
-                                    {(m.users?.email || m.user_id).charAt(0).toUpperCase()}
-                                  </span>
-                                </div>
-                                <div>
-                                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                    {m.users?.email || m.user_id}
-                                  </p>
-                                  <div className="flex items-center gap-2">
-                                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                                      m.role === "admin"
-                                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                                        : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
-                                    }`}>
-                                      {m.role}
+                          {members.map(m => {
+                            const memberEmails = workspaceEmails.filter(ea => ea.assigned_to === m.user_id)
+                            const isEditing = editingMemberId === m.user_id
+                            return (
+                              <div key={m.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shrink-0">
+                                    <span className="text-xs font-bold text-white">
+                                      {(m.users?.email || m.user_id).charAt(0).toUpperCase()}
                                     </span>
                                   </div>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                      {m.users?.email || m.user_id}
+                                    </p>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                                        m.role === "admin"
+                                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                                          : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400"
+                                      }`}>
+                                        {m.role}
+                                      </span>
+                                      {!isEditing && memberEmails.length > 0 && (
+                                        <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                                          <Mail className="h-3 w-3" />
+                                          {memberEmails.map(ea => `${ea.local_part}@${ea.domains?.domain}`).join(", ")}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {isEditing && (
+                                      <div className="mt-2 space-y-1.5">
+                                        {workspaceEmails.map(ea => {
+                                          const isSel = editingEmailIds.includes(ea.id)
+                                          return (
+                                            <label key={ea.id} className="flex items-center gap-2 cursor-pointer text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
+                                              <input
+                                                type="checkbox"
+                                                checked={isSel}
+                                                onChange={() => setEditingEmailIds(prev => isSel ? prev.filter(id => id !== ea.id) : [...prev, ea.id])}
+                                                className="rounded border-gray-300 dark:border-gray-600"
+                                              />
+                                              {ea.local_part}@{ea.domains?.domain}
+                                            </label>
+                                          )
+                                        })}
+                                        <div className="flex gap-1.5 pt-1">
+                                          <Button size="sm" onClick={() => saveAssignments(m.user_id)} disabled={savingAssign}>
+                                            {savingAssign ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                                            Save
+                                          </Button>
+                                          <Button size="sm" variant="outline" onClick={() => setEditingMemberId(null)}>
+                                            Cancel
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {selected.role === "admin" && (
+                                    <Button variant="ghost" size="sm"
+                                      onClick={() => {
+                                        if (isEditing) { setEditingMemberId(null); return }
+                                        setEditingMemberId(m.user_id)
+                                        setEditingEmailIds(memberEmails.map(e => e.id))
+                                      }}
+                                      title="Assign email addresses">
+                                      <AtSign className="h-4 w-4 text-gray-400" />
+                                    </Button>
+                                  )}
+                                  {selected.role === "admin" && m.role !== "admin" && (
+                                    <Button variant="ghost" size="sm" onClick={() => removeMember(m.id)}>
+                                      <UserMinus className="h-4 w-4 text-red-500" />
+                                    </Button>
+                                  )}
                                 </div>
                               </div>
-                              {selected.role === "admin" && m.role !== "admin" && (
-                                <Button variant="ghost" size="sm" onClick={() => removeMember(m.id)}>
-                                  <UserMinus className="h-4 w-4 text-red-500" />
-                                </Button>
-                              )}
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       )}
                     </div>
