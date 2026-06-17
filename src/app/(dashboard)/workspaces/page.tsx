@@ -72,13 +72,14 @@ export default function WorkspacesPage() {
   }
 
   async function loadWorkspaceEmails(wsId: string) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data } = await supabase
-      .from("email_addresses")
-      .select("id, local_part, domains!inner(domain), assigned_to")
-      .eq("workspace_id", wsId)
-    setWorkspaceEmails(data || [])
+    try {
+      const res = await fetch(`/api/workspaces/${wsId}/emails`)
+      if (!res.ok) return
+      const data = await res.json()
+      setWorkspaceEmails(data || [])
+    } catch {
+      setWorkspaceEmails([])
+    }
   }
 
   async function selectWorkspace(ws: Workspace) {
