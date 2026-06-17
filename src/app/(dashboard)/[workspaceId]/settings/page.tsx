@@ -45,7 +45,7 @@ export default function SettingsPage() {
   const workspaceId = params?.workspaceId
   const supabase = createClient()
 
-  useEffect(() => { fetchLocalData() }, [])
+  useEffect(() => { fetchLocalData() }, [workspaceId])
 
   const fetchLocalData = async () => {
     const { data: { user } } = await supabase.auth.getUser()

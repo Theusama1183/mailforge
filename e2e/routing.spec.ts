@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test"
 
-const BASE_URL = "http://localhost:3000"
+export { }
+
+const BASE_URL = process.env.BASE_URL || "http://localhost:3000"
 
 test.describe("MailForge Routing Tests", () => {
   // ──── PUBLIC PAGES (no auth required) ────

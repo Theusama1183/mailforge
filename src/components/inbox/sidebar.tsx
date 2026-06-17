@@ -87,7 +87,7 @@ export function Sidebar({
                 {workspaces.map(ws => (
                   <button
                     key={ws.id}
-                    onClick={() => { switchWorkspace(ws.id); setShowWsDropdown(false) }}
+                    onClick={() => { switchWorkspace(ws.id); router.push(`/${ws.id}/inbox`); setShowWsDropdown(false) }}
                     className={`w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors ${
                       ws.id === activeWorkspace?.id
                         ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 font-medium"
