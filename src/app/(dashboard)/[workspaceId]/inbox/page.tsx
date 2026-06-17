@@ -38,6 +38,14 @@ export default function DashboardPage() {
   const supabase = createClient()
 
   const [fromAddresses, setFromAddresses] = useState<{ local_part: string; domain: string; full: string }[]>([])
+  const [workspaceId, setWorkspaceId] = useState<string>("")
+
+  // Extract workspaceId from URL
+  useEffect(() => {
+    const path = window.location.pathname
+    const match = path.match(/^\/([^/]+)\//)
+    if (match) setWorkspaceId(match[1])
+  }, [])
 
   // Check for compose=1 param in URL
   useEffect(() => {
@@ -61,21 +69,21 @@ export default function DashboardPage() {
         return
       }
 
-      // Fetch from addresses once
-      if (fromAddresses.length === 0) {
-        const { data: emailsData } = await supabase
-          .from("email_addresses")
-          .select("local_part, domains!inner(domain)")
-          .eq("domains.user_id", user.id)
-        if (emailsData) {
-          setFromAddresses(
-            emailsData.map((e) => ({
-              local_part: e.local_part,
-              domain: (e.domains as any).domain,
-              full: `${e.local_part}@${(e.domains as any).domain}`,
-            }))
-          )
-        }
+      // Fetch from addresses via workspace API (works for members too)
+      if (fromAddresses.length === 0 && workspaceId) {
+        try {
+          const res = await fetch(`/api/workspaces/${workspaceId}/emails`)
+          if (res.ok) {
+            const data = await res.json()
+            setFromAddresses(
+              (data || []).map((e: any) => ({
+                local_part: e.local_part,
+                domain: e.domains?.domain || "",
+                full: `${e.local_part}@${e.domains?.domain || ""}`,
+              }))
+            )
+          }
+        } catch {}
       }
 
       const folder = currentFolder === "inbox" ? "inbox" :
@@ -120,7 +128,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }, [currentFolder, selectedAddress, supabase, router, prevEmailCount, fromAddresses.length])
+  }, [currentFolder, selectedAddress, supabase, router, prevEmailCount, fromAddresses.length, workspaceId])
 
   useEffect(() => {
     fetchEmails()
