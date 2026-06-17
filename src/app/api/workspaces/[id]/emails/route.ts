@@ -24,10 +24,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     // Fetch workspace email addresses with domain names
-    const { data: emails, error } = await admin
+    // Admins see all; members only see their assigned
+    let query = admin
       .from("email_addresses")
       .select("id, local_part, domain_id, assigned_to, domains!inner(domain)")
       .eq("workspace_id", id)
+
+    if (membership.role !== "admin") {
+      query = query.eq("assigned_to", user.id)
+    }
+
+    const { data: emails, error } = await query
 
     if (error) {
       console.error("Fetch workspace emails error:", error)
