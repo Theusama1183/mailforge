@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mailforge-email-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-01",
+  "account_id": "03d1682ebdcf105bb3cbe490b4384814",
+  "observability": {
+    "enabled": true
+  }
+}

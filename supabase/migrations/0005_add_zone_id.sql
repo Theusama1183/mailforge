@@ -1,0 +1,2 @@
+ALTER TABLE domains
+ADD COLUMN zone_id TEXT;
