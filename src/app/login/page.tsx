@@ -26,10 +26,35 @@ export default function LoginPage() {
         if (!agreedToTerms) { setError("Please accept the Terms of Service and Privacy Policy"); setLoading(false); return }
         const { error } = await supabase.auth.signUp({ email, password })
         if (error) throw error
-        router.push("/onboarding")
+        // Send OTP for email verification
+        const otpRes = await fetch("/api/auth/send-otp", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        })
+        if (otpRes.ok) {
+          router.push(`/otp?email=${encodeURIComponent(email)}`)
+        } else {
+          router.push("/onboarding")
+        }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) throw error
+
+        // Check if email is confirmed
+        const user = data.user
+        if (user && !user.email_confirmed_at) {
+          // Send OTP and redirect to verification
+          await fetch("/api/auth/send-otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email }),
+          })
+          router.push(`/otp?email=${encodeURIComponent(email)}`)
+          setLoading(false)
+          return
+        }
+
         // Check if user has completed onboarding
         const userId = data.user?.id
         if (userId) {
