@@ -13,13 +13,29 @@ function sanitizeHtml(html: string): string {
   // Dynamic import to avoid SSR issues
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const DOMPurify = require("dompurify") as typeof import("dompurify").default
-  return DOMPurify.sanitize(html, {
+
+  // If this is a full HTML document, extract just the body content
+  let cleanHtml = html
+  if (/^\s*<(?:!DOCTYPE|html)/i.test(html)) {
+    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+    if (bodyMatch) {
+      cleanHtml = bodyMatch[1]
+    } else {
+      // Strip outer html/head/body tags
+      cleanHtml = html
+        .replace(/^[\s\S]*?<body[^>]*>/i, '')
+        .replace(/<\/body>[\s\S]*$/i, '')
+        .replace(/<\/html>\s*$/i, '')
+    }
+  }
+
+  return DOMPurify.sanitize(cleanHtml, {
     ALLOWED_TAGS: [
       "p", "br", "span", "div", "h1", "h2", "h3", "h4", "h5", "h6",
       "a", "img", "ul", "ol", "li", "table", "thead", "tbody", "tr", "td", "th",
       "blockquote", "pre", "code", "strong", "em", "u", "s", "hr", "dl", "dt", "dd",
     ],
-    ALLOWED_ATTR: ["href", "src", "alt", "width", "height", "style", "class", "target", "rel", "title"],
+    ALLOWED_ATTR: ["href", "src", "alt", "width", "height", "class", "target", "rel", "title"],
     ALLOW_DATA_ATTR: false,
     ADD_ATTR: ["target"],
   })
