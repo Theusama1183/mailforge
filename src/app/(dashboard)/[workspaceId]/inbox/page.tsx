@@ -473,7 +473,7 @@ export default function DashboardPage() {
         replyTo={replyTarget ? {
           to: composeMode === "forward" ? "" : (composeMode === "replyAll" ? [replyTarget.from_address, ...(replyTarget.cc_addresses || [])].join(", ") : replyTarget.from_address),
           subject: replyTarget.subject || "",
-          body: replyTarget.body_text || replyTarget.body_html || "",
+          body: replyTarget.body_text || replyTarget.body_html?.replace(/<[^>]*>/g, "").trim() || "",
           mode: composeMode,
         } : undefined}
         key={showCompose ? (replyTarget?.id || "new") : "closed"}
