@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getAuthUser } from "@/lib/supabase/api-client"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
   try {
     const { token } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const auth = await getAuthUser(req)
+
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { user  } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const admin = createAdminClient()

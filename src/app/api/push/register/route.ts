@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getAuthUser } from "@/lib/supabase/api-client"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function POST(req: Request) {
@@ -9,8 +9,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Token required" }, { status: 400 })
     }
 
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const auth = await getAuthUser(req)
+
+
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+
+    const { user  } = auth
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
@@ -49,8 +54,13 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Token required" }, { status: 400 })
     }
 
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const auth = await getAuthUser(req)
+
+
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+
+    const { user  } = auth
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getAuthUser } from "@/lib/supabase/api-client"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function GET(req: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const auth = await getAuthUser(req)
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { user, supabase } = auth
 
     const { data: memberships } = await supabase
       .from("workspace_members")
@@ -23,9 +23,11 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    // Use regular client for auth check (reads cookies from request)
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const auth = await getAuthUser(req)
+
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { user  } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { name } = await req.json()

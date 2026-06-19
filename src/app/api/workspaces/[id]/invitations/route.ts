@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getAuthUser } from "@/lib/supabase/api-client"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { sendEmail, renderInviteEmail } from "@/lib/email"
 import crypto from "crypto"
@@ -7,8 +7,11 @@ import crypto from "crypto"
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const auth = await getAuthUser(req)
+
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { user  } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const admin = createAdminClient()
@@ -28,8 +31,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const auth = await getAuthUser(req)
+
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { user  } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { email, message, emailIds } = await req.json()
@@ -144,8 +150,13 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const inviteId = url.searchParams.get("invite_id")
     if (!inviteId) return NextResponse.json({ error: "invite_id required" }, { status: 400 })
 
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const auth = await getAuthUser(req)
+
+
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+
+    const { user  } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const admin = createAdminClient()

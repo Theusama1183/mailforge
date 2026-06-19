@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getAuthUser } from "@/lib/supabase/api-client"
 import CryptoJS from "crypto-js"
 
 function getEncryptionKey(): string {
@@ -16,9 +16,9 @@ function encrypt(text: string): string {
 
 export async function GET(req: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const auth = await getAuthUser(req)
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { supabase, user } = auth
 
     const { data, error } = await supabase
       .from("imap_accounts")
@@ -35,9 +35,9 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const auth = await getAuthUser(req)
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { supabase, user } = auth
 
     const body = await req.json()
     if (!body.host || !body.username || !body.password) {

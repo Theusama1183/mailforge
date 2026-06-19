@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getAuthUser } from "@/lib/supabase/api-client"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { syncMailbox, listMailboxes, mapFolder, DEFAULT_MAILBOXES } from "@/lib/imap"
 import CryptoJS from "crypto-js"
@@ -19,8 +19,11 @@ function decrypt(encrypted: string): string {
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const auth = await getAuthUser(req)
+
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { user, supabase  } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { data: account } = await supabase

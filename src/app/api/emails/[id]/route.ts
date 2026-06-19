@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getAuthUser } from "@/lib/supabase/api-client"
 
 const ALLOWED_FIELDS = ["subject", "body_html", "body_text", "starred", "read", "archived", "folder", "mailbox"] as const
 type AllowedField = typeof ALLOWED_FIELDS[number]
@@ -8,9 +8,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   try {
     const { id } = await params
     const body = await req.json()
-    const supabase = await createClient()
+    const auth = await getAuthUser(req)
 
-    const { data: { user } } = await supabase.auth.getUser()
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { user, supabase  } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     // Field whitelisting: only allow specific fields to be updated
@@ -41,9 +43,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const supabase = await createClient()
+    const auth = await getAuthUser(req)
 
-    const { data: { user } } = await supabase.auth.getUser()
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { user, supabase  } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { error } = await supabase

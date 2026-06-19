@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getAuthUser } from "@/lib/supabase/api-client"
 import { sendEmail } from "@/lib/send"
 
 export async function POST(req: Request) {
@@ -10,7 +10,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    // Authenticate and verify the userId matches the authenticated user
+    const auth = await getAuthUser(req)
+
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { user, supabase  } = auth
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (user.id !== userId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
 
     const { data: domains } = await supabase
       .from("domains")

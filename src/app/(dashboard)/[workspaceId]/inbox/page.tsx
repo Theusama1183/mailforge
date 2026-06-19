@@ -1,18 +1,19 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { EmailList } from "@/components/inbox/email-list"
+import { InboxList } from "@/components/inbox/inbox-list"
 import { EmailViewer } from "@/components/inbox/email-viewer"
 import { ComposeDialog } from "@/components/compose/compose-dialog"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { ChevronDown, Mail, Search as SearchIcon } from "lucide-react"
+import { ChevronDown, Mail, Search as SearchIcon, Send, Star, Archive, Trash2, FileText, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { toast } from "sonner"
 import { useEmailSearch } from "@/hooks/use-email-search"
 import { useRealtimeEmails } from "@/hooks/use-realtime-emails"
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
+import { decodeMimeSubject } from "@/lib/email-utils"
 import type { Email } from "@/types"
 
 export const dynamic = "force-dynamic"
@@ -112,7 +113,7 @@ export default function DashboardPage() {
         if (prevEmailCount > 0 && data.length > prevEmailCount) {
           const newCount = data.length - prevEmailCount
           toast(`${newCount} new email(s)`, {
-            description: data[0]?.subject || "Received in inbox",
+            description: decodeMimeSubject(data[0]?.subject) || "Received in inbox",
             icon: <Mail className="h-4 w-4 text-blue-500" />,
           })
         }
@@ -394,19 +395,14 @@ export default function DashboardPage() {
           role="region"
           aria-label="Email list panel"
         >
-          {loading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent" aria-label="Loading emails" />
-            </div>
-          ) : (
-            <EmailList
-              emails={displayEmails}
-              selectedId={selectedEmailId ?? undefined}
-              onSelect={handleSelect}
-              onStar={handleStar}
-              threadCounts={threadCounts}
-            />
-          )}
+          <InboxList
+            emails={displayEmails}
+            selectedId={selectedEmailId ?? undefined}
+            onSelect={handleSelect}
+            onStar={handleStar}
+            threadCounts={threadCounts}
+            loading={loading}
+          />
         </div>
 
         <div
@@ -446,17 +442,7 @@ export default function DashboardPage() {
               }}
             />
           ) : (
-            <div className="flex items-center justify-center h-full text-gray-400">
-              <div className="text-center">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
-                  <svg className="w-8 h-8 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <p className="text-sm font-medium text-gray-500">Select an email to read</p>
-                <p className="text-xs text-gray-400 mt-1">Choose from your inbox</p>
-              </div>
-            </div>
+            <EmptyEmailDetail folder={currentFolder} />
           )}
         </div>
       </div>
@@ -480,4 +466,62 @@ export default function DashboardPage() {
       />
     </>
   )
+}
+
+/**
+ * Contextual empty state for the email detail panel.
+ * Shows a different message depending on the current folder.
+ */
+function EmptyEmailDetail({ folder }: { folder: string }) {
+  const config = EMPTY_DETAIL_CONFIG[folder] || EMPTY_DETAIL_CONFIG.inbox
+
+  return (
+    <div className="flex items-center justify-center h-full text-gray-400">
+      <div className="text-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
+          <config.icon className="h-8 w-8 text-gray-300 dark:text-gray-600" aria-hidden="true" />
+        </div>
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{config.title}</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{config.subtitle}</p>
+      </div>
+    </div>
+  )
+}
+
+const EMPTY_DETAIL_CONFIG: Record<string, { icon: React.ComponentType<{ className?: string }>; title: string; subtitle: string }> = {
+  inbox: {
+    icon: Mail,
+    title: "Select an email to read",
+    subtitle: "Choose from your inbox",
+  },
+  sent: {
+    icon: Send,
+    title: "Select a sent email",
+    subtitle: "View your sent messages",
+  },
+  drafts: {
+    icon: FileText,
+    title: "Select a draft",
+    subtitle: "Continue editing your drafts",
+  },
+  starred: {
+    icon: Star,
+    title: "Select a starred email",
+    subtitle: "View your bookmarked messages",
+  },
+  archive: {
+    icon: Archive,
+    title: "Select an archived email",
+    subtitle: "Browse your archived messages",
+  },
+  spam: {
+    icon: AlertTriangle,
+    title: "Select an email",
+    subtitle: "Review your spam folder",
+  },
+  trash: {
+    icon: Trash2,
+    title: "Select a deleted email",
+    subtitle: "View messages in trash",
+  },
 }
