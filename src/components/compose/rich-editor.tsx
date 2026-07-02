@@ -4,6 +4,7 @@ import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import Placeholder from "@tiptap/extension-placeholder"
 import { Bold, Italic, List, Heading } from "lucide-react"
+import { useEffect } from "react"
 
 export function RichEditor({
   value,
@@ -29,6 +30,14 @@ export function RichEditor({
       },
     },
   })
+
+  useEffect(() => {
+    if (!editor) return
+    const currentHtml = editor.getHTML()
+    if (value !== currentHtml) {
+      editor.commands.setContent(value || "")
+    }
+  }, [editor, value])
 
   if (!editor) return null
 

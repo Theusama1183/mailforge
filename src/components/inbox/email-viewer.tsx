@@ -29,14 +29,9 @@ function sanitizeHtml(html: string): string {
   }
 
   return DOMPurify.sanitize(cleanHtml, {
-    ALLOWED_TAGS: [
-      "p", "br", "span", "div", "h1", "h2", "h3", "h4", "h5", "h6",
-      "a", "img", "ul", "ol", "li", "table", "thead", "tbody", "tr", "td", "th",
-      "blockquote", "pre", "code", "strong", "em", "u", "s", "hr", "dl", "dt", "dd",
-    ],
-    ALLOWED_ATTR: ["href", "src", "alt", "width", "height", "class", "target", "rel", "title"],
+    ADD_TAGS: ["style"],
     ALLOW_DATA_ATTR: false,
-    ADD_ATTR: ["target"],
+    ADD_ATTR: ["target", "style", "align", "valign", "bgcolor", "cellpadding", "cellspacing", "border"],
   })
 }
 
@@ -89,13 +84,13 @@ export function EmailViewer({
         {sanitizedHtml ? (
           <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
             <div
-              className="email-body-html prose prose-sm dark:prose-invert max-w-none break-words"
+              className="email-body-html max-w-none break-words"
               dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
             />
           </div>
         ) : (
           <EmailBodyRenderer
-            bodyHtml={null}
+            bodyHtml={email.body_html}
             bodyText={email.body_text}
             subject={email.subject}
           />

@@ -47,7 +47,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       trash: "inbox?folder=trash",
       analytics: "analytics",
       templates: "templates",
-      imap: "imap-sync",
+      "imap-sync": "imap-sync",
       workspaces: "workspaces",
       settings: "settings",
     }

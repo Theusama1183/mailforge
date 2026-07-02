@@ -85,9 +85,11 @@ export function ComposeDialog({
   const [sending, setSending] = useState(false)
   const [templates, setTemplates] = useState<Template[]>([])
   const [showTemplates, setShowTemplates] = useState(false)
+  const [showRichText, setShowRichText] = useState(true)
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
+  const editorRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -146,8 +148,11 @@ export function ComposeDialog({
 
   function insertTemplate(t: Template) {
     if (t.subject) setSubject(t.subject)
-    if (t.body_html) setBodyHtml(t.body_html)
     if (t.body_text) setBodyText(t.body_text)
+    if (t.body_html) {
+      setBodyHtml(t.body_html)
+      setShowRichText(false)
+    }
     setShowTemplates(false)
   }
 
@@ -207,6 +212,17 @@ export function ComposeDialog({
     setBodyText(text)
   }, [])
 
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const html = e.clipboardData.getData("text/html")
+    if (html && /<(table|div|style|img|hr|center|font|span)[^>]*>/i.test(html)) {
+      e.preventDefault()
+      e.stopPropagation()
+      setBodyHtml(html)
+      setBodyText(e.clipboardData.getData("text/plain") || html.replace(/<[^>]*>/g, ""))
+      setShowRichText(false)
+    }
+  }, [])
+
   if (minimized) {
     return (
       <div className="fixed bottom-0 right-6 z-50">
@@ -230,7 +246,7 @@ export function ComposeDialog({
       aria-label="Compose email"
       className="fixed bottom-0 right-6 z-50 w-[560px] max-w-[calc(100vw-2rem)]"
     >
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-t-xl shadow-2xl">
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-t-xl shadow-2xl" onPaste={handlePaste}>
         <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-t-xl border-b border-gray-100 dark:border-gray-700">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{modeLabel}</span>
           <div className="flex items-center gap-1">
@@ -288,7 +304,27 @@ export function ComposeDialog({
           <label htmlFor="compose-subject" className="sr-only">Subject</label>
           <Input id="compose-subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className="border-0 border-b border-gray-100 dark:border-gray-700 rounded-none px-0 h-8 text-sm font-medium focus:ring-0" />
 
-          <RichEditor value={bodyText} onChange={handleEditorChange} placeholder="Write your message..." />
+          {showRichText ? (
+            <RichEditor value={bodyText} onChange={handleEditorChange} placeholder="Write your message..." />
+          ) : bodyHtml ? (
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                <span className="text-xs font-medium text-gray-500">HTML Template</span>
+                <button
+                  type="button"
+                  onClick={() => { setShowRichText(true); setBodyHtml("") }}
+                  className="text-xs text-blue-600 hover:text-blue-700"
+                >
+                  Edit as Rich Text
+                </button>
+              </div>
+              <div
+                ref={editorRef}
+                className="p-3 max-h-[300px] overflow-y-auto text-sm"
+                dangerouslySetInnerHTML={{ __html: bodyHtml }}
+              />
+            </div>
+          ) : null}
 
           {attachmentError && (
             <p className="text-xs text-red-500" role="alert">{attachmentError}</p>

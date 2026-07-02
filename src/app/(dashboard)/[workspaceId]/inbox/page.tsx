@@ -5,7 +5,7 @@ import { InboxList } from "@/components/inbox/inbox-list"
 import { EmailViewer } from "@/components/inbox/email-viewer"
 import { ComposeDialog } from "@/components/compose/compose-dialog"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ChevronDown, Mail, Search as SearchIcon, Send, Star, Archive, Trash2, FileText, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
@@ -28,7 +28,6 @@ export default function DashboardPage() {
   const [composeMode, setComposeMode] = useState<ComposeMode>("new")
   const [replyTarget, setReplyTarget] = useState<Email | null>(null)
   const [loading, setLoading] = useState(true)
-  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
   const [selectedAddress, setSelectedAddress] = useState("all")
   const [showAddressDropdown, setShowAddressDropdown] = useState(false)
   const [prevEmailCount, setPrevEmailCount] = useState(0)
@@ -36,6 +35,7 @@ export default function DashboardPage() {
   const [showSearch, setShowSearch] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   const [fromAddresses, setFromAddresses] = useState<{ local_part: string; domain: string; full: string }[]>([])
@@ -44,17 +44,17 @@ export default function DashboardPage() {
   // Extract workspaceId from URL
   useEffect(() => {
     const path = window.location.pathname
-    const match = path.match(/^\/([^/]+)\//)
-    if (match) setWorkspaceId(match[1])
+    const segments = path.split("/").filter(Boolean)
+    if (segments.length > 0) setWorkspaceId(segments[0])
   }, [])
 
-  // Check for compose=1 param in URL
+  // Sync URL params with state
   useEffect(() => {
-    if (window.location.search.includes("compose=1")) {
-      setShowCompose(true)
-      window.history.replaceState({}, "", window.location.pathname)
-    }
-  }, [])
+    const folder = searchParams.get("folder")
+    const compose = searchParams.get("compose")
+    setCurrentFolder(folder || "inbox")
+    if (compose) setShowCompose(true)
+  }, [searchParams])
 
   const selectedEmail = useMemo(
     () => emails.find((e) => e.id === selectedEmailId),
@@ -119,10 +119,6 @@ export default function DashboardPage() {
         }
         setPrevEmailCount(data.length)
         setEmails(data as Email[])
-        if (currentFolder === "inbox") {
-          const unread = data.filter((e) => !e.read).length
-          setUnreadCounts((prev) => ({ ...prev, inbox: unread }))
-        }
       }
     } catch (err) {
       console.error("Error fetching emails:", err)
@@ -270,17 +266,16 @@ export default function DashboardPage() {
     if (email && !email.read) {
       await supabase.from("emails").update({ read: true }).eq("id", id)
       setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, read: true } : e)))
-      setUnreadCounts((prev) => ({ ...prev, inbox: Math.max(0, (prev.inbox || 0) - 1) }))
     }
   }
 
   const handleFolderChange = (folder: string) => {
     if (["settings", "analytics", "templates", "imap-sync", "workspaces"].includes(folder)) {
       const routeMap: Record<string, string> = {
-        settings: "/settings",
-        analytics: "/analytics",
-        templates: "/templates",
-        "imap-sync": "/imap-sync",
+        settings: `/${workspaceId}/settings`,
+        analytics: `/${workspaceId}/analytics`,
+        templates: `/${workspaceId}/templates`,
+        "imap-sync": `/${workspaceId}/imap-sync`,
         workspaces: "/workspaces",
       }
       router.push(routeMap[folder])
@@ -288,6 +283,7 @@ export default function DashboardPage() {
     }
     setCurrentFolder(folder)
     setSelectedEmailId(null)
+    router.push(`/${workspaceId}/inbox?folder=${folder}`, { scroll: false })
   }
 
   const selectedLabel = selectedAddress === "all" ? "All Addresses" : selectedAddress
@@ -402,6 +398,7 @@ export default function DashboardPage() {
             onStar={handleStar}
             threadCounts={threadCounts}
             loading={loading}
+            currentFolder={currentFolder}
           />
         </div>
 

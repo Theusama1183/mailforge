@@ -23,7 +23,10 @@ export function InboxItem({
   onSelect,
   onStar,
 }: InboxItemProps) {
-  const handleSelect = useCallback(() => onSelect(email.id), [email.id, onSelect])
+  const handleSelect = useCallback(() => {
+    if (window.getSelection()?.toString()) return
+    onSelect(email.id)
+  }, [email.id, onSelect])
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       // Activate on Enter or Space (same as button behavior)
@@ -128,7 +131,7 @@ export function InboxItem({
               "p-0.5 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
               email.starred
                 ? "text-yellow-400 hover:text-yellow-500"
-                : "text-gray-300 dark:text-gray-600 opacity-0 group-hover:opacity-100 hover:text-yellow-400"
+                : "text-gray-300 dark:text-gray-500 hover:text-yellow-400"
             )}
             aria-label={email.starred ? "Unstar email" : "Star email"}
           >

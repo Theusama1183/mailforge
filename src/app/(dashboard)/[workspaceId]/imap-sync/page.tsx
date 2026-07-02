@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Trash2, RefreshCw, Server, CheckCircle, XCircle } from "lucide-react"
@@ -33,6 +33,8 @@ export default function ImapSettingsPage() {
   const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null)
   const supabase = createClient()
   const router = useRouter()
+  const params = useParams()
+  const workspaceId = params.workspaceId as string
 
   useEffect(() => {
     loadAccounts()
@@ -80,7 +82,7 @@ export default function ImapSettingsPage() {
     const data = await res.json()
     setSyncing(null)
     if (data.synced !== undefined) {
-      router.push("/inbox")
+      router.push(`/${workspaceId}/inbox`)
     }
   }
 

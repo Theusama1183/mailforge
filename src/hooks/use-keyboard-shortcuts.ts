@@ -14,6 +14,7 @@ interface KeyboardShortcutMap {
 export function useKeyboardShortcuts(shortcuts: KeyboardShortcutMap) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey) return
       const target = e.target as HTMLElement
       if (
         target.tagName === "INPUT" ||

@@ -81,7 +81,7 @@ export function EmailBodyRenderer({ bodyHtml, bodyText, subject }: EmailBodyRend
           {/* HTML view */}
           {!showRaw && hasHtml ? (
             <div
-              className="email-body-html prose prose-sm dark:prose-invert max-w-none break-words"
+              className="email-body-html max-w-none break-words"
               dangerouslySetInnerHTML={{
                 __html: sanitizeHtml(bodyHtml || ""),
               }}
@@ -184,7 +184,7 @@ function sanitizeHtml(html: string): string {
     try {
       const doc = new DOMParser().parseFromString(html, "text/html")
       // Remove script tags
-      const scripts = doc.querySelectorAll("script, iframe, object, embed, style, link")
+      const scripts = doc.querySelectorAll("script, iframe, object, embed, link")
       scripts.forEach((el) => el.remove())
       // Remove event handler attributes
       const allElements = doc.querySelectorAll("*")
@@ -213,7 +213,6 @@ function sanitizeHtml(html: string): string {
     .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, "")
     .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, "")
     .replace(/<embed[^>]*>[\s\S]*?<\/embed>/gi, "")
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
     .replace(/<link[^>]*>/gi, "")
     .replace(/\son\w+\s*=\s*"[^"]*"/gi, "")
     .replace(/\son\w+\s*=\s*'[^']*'/gi, "")

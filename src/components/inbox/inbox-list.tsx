@@ -3,7 +3,7 @@
 import { useCallback, useRef, useEffect } from "react"
 import { InboxItem } from "./inbox-item"
 import { decodeMimeSubject } from "@/lib/email-utils"
-import { Mail } from "lucide-react"
+import { Mail, Send, FileText, Star, Archive, AlertTriangle, Trash2 } from "lucide-react"
 import type { Email } from "@/types"
 
 interface InboxListProps {
@@ -13,6 +13,17 @@ interface InboxListProps {
   onStar: (id: string, starred: boolean) => void
   threadCounts?: Record<string, number>
   loading?: boolean
+  currentFolder?: string
+}
+
+const EMPTY_LIST_CONFIG: Record<string, { icon: React.ComponentType<{ className?: string }>; title: string; subtitle: string }> = {
+  inbox: { icon: Mail, title: "No emails yet", subtitle: "When emails arrive, they'll appear here" },
+  sent: { icon: Send, title: "No sent emails", subtitle: "Emails you send will appear here" },
+  drafts: { icon: FileText, title: "No drafts", subtitle: "Saved drafts will appear here" },
+  starred: { icon: Star, title: "No starred emails", subtitle: "Starred emails will appear here" },
+  archive: { icon: Archive, title: "No archived emails", subtitle: "Archived emails will appear here" },
+  spam: { icon: AlertTriangle, title: "No spam", subtitle: "Spam emails will appear here" },
+  trash: { icon: Trash2, title: "Trash is empty", subtitle: "Deleted emails will appear here" },
 }
 
 /**
@@ -26,6 +37,7 @@ export function InboxList({
   onStar,
   threadCounts = {},
   loading = false,
+  currentFolder = "inbox",
 }: InboxListProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const selectedRef = useRef<HTMLDivElement>(null)
@@ -83,17 +95,19 @@ export function InboxList({
 
   // Empty state
   if (emails.length === 0) {
+    const config = EMPTY_LIST_CONFIG[currentFolder] || EMPTY_LIST_CONFIG.inbox
+    const Icon = config.icon
     return (
       <div className="flex-1 flex items-center justify-center p-6" ref={containerRef}>
         <div className="text-center">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
-            <Mail className="h-8 w-8 text-gray-300 dark:text-gray-600" />
+            <Icon className="h-8 w-8 text-gray-300 dark:text-gray-600" />
           </div>
           <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-            No emails yet
+            {config.title}
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            When emails arrive, they&apos;ll appear here
+            {config.subtitle}
           </p>
         </div>
       </div>
