@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Trash2, RefreshCw, Server, CheckCircle, XCircle } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
+import { toast } from "sonner"
 
 interface ImapAccount {
   id: string
@@ -82,7 +83,14 @@ export default function ImapSettingsPage() {
     const data = await res.json()
     setSyncing(null)
     if (data.synced !== undefined) {
-      router.push(`/${workspaceId}/inbox`)
+      if (data.synced > 0) {
+        toast.success(`${data.synced} email(s) synced`)
+        router.push(`/${workspaceId}/inbox`)
+      } else {
+        toast.error("No emails found to sync. Check your mailbox or IMAP settings.")
+      }
+    } else {
+      toast.error(data.error || "Sync failed")
     }
   }
 
