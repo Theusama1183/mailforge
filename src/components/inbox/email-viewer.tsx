@@ -172,17 +172,11 @@ export function EmailViewer({
         .email-body-html table {
           border-collapse: collapse;
           width: 100%;
-          margin: 0.75rem 0;
         }
         .email-body-html th,
         .email-body-html td {
-          border: 1px solid #e5e7eb;
           padding: 0.5rem;
           text-align: left;
-        }
-        .dark .email-body-html th,
-        .dark .email-body-html td {
-          border-color: #374151;
         }
       `}</style>
     </div>
