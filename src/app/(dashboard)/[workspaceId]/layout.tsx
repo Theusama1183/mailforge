@@ -28,8 +28,9 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
         try {
           const res = await fetch("/api/workspaces")
           const data = await res.json()
-          setWorkspaces(data || [])
-          currentWorkspaces = data || []
+          const list = Array.isArray(data) ? data : []
+          setWorkspaces(list)
+          currentWorkspaces = list
         } catch {
           router.push("/workspaces")
           return

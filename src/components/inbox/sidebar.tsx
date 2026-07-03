@@ -40,7 +40,7 @@ export function Sidebar({
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       fetch("/api/workspaces").then(res => res.json()).then(data => {
-        setWorkspaces(data || [])
+        setWorkspaces(Array.isArray(data) ? data : [])
       })
     })
   }, [supabase, setWorkspaces])
