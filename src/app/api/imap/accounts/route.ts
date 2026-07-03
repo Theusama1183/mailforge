@@ -61,6 +61,7 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json(data)
   } catch (error) {
-    return NextResponse.json({ error: "Failed to create IMAP account" }, { status: 500 })
+    const message = error instanceof Error ? error.message : "Failed to create IMAP account"
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

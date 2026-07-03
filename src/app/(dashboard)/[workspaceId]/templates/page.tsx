@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { RichEditor } from "@/components/compose/rich-editor"
-import { Plus, Save, Trash2, FileText, Clock } from "lucide-react"
+import { Plus, Save, Trash2, FileText, Clock, ExternalLink } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 
 interface Template {
@@ -19,6 +19,15 @@ interface Template {
   updated_at: string
 }
 
+function isBuilderTemplate(t: Template): boolean {
+  try {
+    const parsed = JSON.parse(t.body_text)
+    return parsed && typeof parsed === "object" && parsed.root
+  } catch {
+    return false
+  }
+}
+
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(true)
@@ -29,6 +38,8 @@ export default function TemplatesPage() {
   const [bodyText, setBodyText] = useState("")
   const supabase = createClient()
   const router = useRouter()
+  const params = useParams()
+  const workspaceId = params.workspaceId as string
 
   useEffect(() => {
     loadTemplates()
@@ -122,6 +133,17 @@ export default function TemplatesPage() {
                       <Clock className="h-3 w-3 text-gray-400" />
                       <span className="text-[10px] text-gray-400">{new Date(t.updated_at).toLocaleDateString()}</span>
                     </div>
+                    {isBuilderTemplate(t) && (
+                      <div className="mt-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); router.push(`/${workspaceId}/templates/builder#${t.id}`) }}
+                          className="flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-700"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Open Builder
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -131,11 +153,25 @@ export default function TemplatesPage() {
                   <div className="space-y-4">
                     <Input value={name} onChange={e => setName(e.target.value)} placeholder="Template name" className="font-medium" />
                     <Input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Subject (optional)" />
-                    <RichEditor value={bodyText} onChange={(html, text) => { setBodyHtml(html); setBodyText(text) }} placeholder="Template body..." />
+                    {isBuilderTemplate(editing) ? (
+                      <div className="p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-center">
+                        <p className="text-sm text-gray-500 mb-3">This template was created with the Email Builder.</p>
+                        <Button onClick={() => router.push(`/${workspaceId}/templates/builder#${editing.id}`)} className="gap-2">
+                          <ExternalLink className="h-4 w-4" />
+                          Open in Builder
+                        </Button>
+                      </div>
+                    ) : (
+                      <RichEditor value={bodyText} onChange={(html, text) => { setBodyHtml(html); setBodyText(text) }} placeholder="Template body..." />
+                    )}
                     <div className="flex items-center gap-2">
                       <Button onClick={save} className="gap-2">
                         <Save className="h-4 w-4" />
                         Save
+                      </Button>
+                      <Button variant="outline" onClick={() => router.push(`/${workspaceId}/templates/builder#${editing.id || ''}`)} className="gap-2">
+                        <ExternalLink className="h-4 w-4" />
+                        {editing.id ? 'Edit in Builder' : 'New Builder Template'}
                       </Button>
                       {editing.id && (
                         <Button variant="destructive" size="sm" onClick={() => remove(editing.id)} className="gap-2">

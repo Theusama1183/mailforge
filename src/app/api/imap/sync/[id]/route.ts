@@ -48,7 +48,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     let totalSynced = 0
 
     for (const mb of mailboxes) {
-      const folder = mapFolder(mb.name)
+      const folder = mapFolder(mb.path)
       if (!DEFAULT_MAILBOXES.includes(folder) && !folder.startsWith("INBOX")) continue
 
       const { data: syncState } = await adminDb
@@ -68,8 +68,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         user_id: user.id,
         mailbox_address: account.username,
         from_address: msg.from,
-        to_addresses: msg.to.split(",").map((s: string) => s.trim()),
-        cc_addresses: msg.cc ? msg.cc.split(",").map((s: string) => s.trim()) : [],
+        to_addresses: msg.to ? msg.to.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
+        cc_addresses: msg.cc ? msg.cc.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
         subject: msg.subject,
         body_html: msg.bodyHtml || null,
         body_text: msg.bodyText || null,
@@ -77,7 +77,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         folder: folder.toLowerCase(),
         message_id: msg.messageId || null,
         in_reply_to: msg.inReplyTo || null,
-        references: msg.references || null,
+        references: msg.references ? (Array.isArray(msg.references) ? msg.references : msg.references.split(/\s+/).filter(Boolean)) : [],
         created_at: msg.date || new Date().toISOString(),
       }))
 

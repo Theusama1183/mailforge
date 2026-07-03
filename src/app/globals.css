@@ -67,6 +67,12 @@
   pointer-events: none;
 }
 
+/* Slide-in animation for offcanvas compose dialog */
+@keyframes slideInFromRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
 /* Focus visible styles for keyboard navigation */
 *:focus-visible {
   outline: 2px solid var(--color-primary);

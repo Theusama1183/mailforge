@@ -1,14 +1,14 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { RichEditor } from "./rich-editor"
 import { createClient } from "@/lib/supabase/client"
-import { X, Minus, Send, Paperclip, FileText, LayoutTemplate } from "lucide-react"
+import { X, Minus, Send, Paperclip, FileText, Mail, LayoutTemplate } from "lucide-react"
 
-const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024 // 25MB
+const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024
 const ALLOWED_FILE_TYPES = [
   "application/pdf",
   "image/jpeg", "image/png", "image/gif", "image/webp",
@@ -46,6 +46,12 @@ interface Template {
   body_text: string
 }
 
+function extractPlaceholders(text: string): string[] {
+  const matches = text.match(/\{(\w+)\}/g)
+  if (!matches) return []
+  return [...new Set(matches.map((m) => m.replace(/[{}]/g, "")))]
+}
+
 export function ComposeDialog({
   open,
   onClose,
@@ -73,6 +79,7 @@ export function ComposeDialog({
       : ""
   )
   const [bodyHtml, setBodyHtml] = useState("")
+  const [templateHtml, setTemplateHtml] = useState("")
   const [bodyText, setBodyText] = useState(
     replyTo?.mode === "forward"
       ? `\n\n---------- Forwarded message ---------\n${replyTo.body}`
@@ -84,12 +91,14 @@ export function ComposeDialog({
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [sending, setSending] = useState(false)
   const [templates, setTemplates] = useState<Template[]>([])
+  const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>({})
   const [showTemplates, setShowTemplates] = useState(false)
-  const [showRichText, setShowRichText] = useState(true)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedHtml, setEditedHtml] = useState("")
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
-  const editorRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -102,7 +111,43 @@ export function ComposeDialog({
     })
   }, [open])
 
-  // Focus trap: keep focus within the dialog when open
+  useEffect(() => {
+    if (!isEditing || !contentRef.current) return
+    const root = contentRef.current
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT)
+    const handler = (e: Event) => {
+      const ke = e as KeyboardEvent
+      if ((ke.ctrlKey || ke.metaKey) && ["b", "i", "u", "s", "j"].includes(ke.key.toLowerCase())) {
+        e.preventDefault()
+      }
+    }
+    const pasteHandler = (e: ClipboardEvent) => {
+      e.preventDefault()
+      const text = e.clipboardData?.getData("text/plain") || ""
+      document.execCommand("insertText", false, text)
+    }
+    while (walker.nextNode()) {
+      const node = walker.currentNode as HTMLElement
+      if (node === root) continue
+      const hasText = !node.hasChildNodes() || (node.childNodes.length === 1 && node.firstChild?.nodeType === Node.TEXT_NODE)
+      if (hasText && node.textContent?.trim()) {
+        node.contentEditable = "true"
+        node.addEventListener("keydown", handler)
+        node.addEventListener("paste", pasteHandler)
+      } else {
+        node.contentEditable = "false"
+      }
+    }
+    return () => {
+      const w = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT)
+      while (w.nextNode()) {
+        const n = w.currentNode as HTMLElement
+        n.removeEventListener("keydown", handler)
+        n.removeEventListener("paste", pasteHandler)
+      }
+    }
+  }, [isEditing])
+
   useEffect(() => {
     if (!open || minimized) return
 
@@ -112,7 +157,6 @@ export function ComposeDialog({
     const focusableSelector = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     const previouslyFocused = document.activeElement as HTMLElement
 
-    // Focus the first focusable element
     const firstFocusable = dialog.querySelector<HTMLElement>(focusableSelector)
     firstFocusable?.focus()
 
@@ -146,15 +190,52 @@ export function ComposeDialog({
     }
   }, [open, minimized])
 
-  function insertTemplate(t: Template) {
-    if (t.subject) setSubject(t.subject)
-    if (t.body_text) setBodyText(t.body_text)
-    if (t.body_html) {
-      setBodyHtml(t.body_html)
-      setShowRichText(false)
-    }
+  function handleTemplateSelect(templateId: string) {
     setShowTemplates(false)
+    const t = templates.find((tmpl) => tmpl.id === templateId)
+    if (!t) return
+
+    if (t.subject) setSubject(t.subject)
+
+    const contentMatch = t.body_html?.match(/{{(?:content|body)}}([\s\S]*?){{\/(?:content|body)}}/)?.[1]
+    if (contentMatch) {
+      setTemplateHtml(t.body_html)
+      setBodyHtml(t.body_html)
+      setBodyText(contentMatch.trim())
+    } else if (t.body_html) {
+      setTemplateHtml(t.body_html)
+      setBodyHtml(t.body_html)
+      setBodyText(t.body_text || "")
+    } else {
+      setBodyText(t.body_text || "")
+    }
+
+    setIsEditing(false)
+    setEditedHtml(t.body_html || "")
+
+    const allText = `${t.subject || ""} ${t.body_text || ""} ${t.body_html || ""}`
+    const placeholders = extractPlaceholders(allText)
+    const values: Record<string, string> = {}
+    for (const p of placeholders) {
+      values[p] = ""
+    }
+    setPlaceholderValues(values)
   }
+
+  function replacePlaceholders(text: string): string {
+    let result = text
+    for (const [key, value] of Object.entries(placeholderValues)) {
+      if (value) {
+        result = result.replace(new RegExp(`\\{${key}\\}`, "g"), value)
+      }
+    }
+    return result
+  }
+
+  const placeholders = useMemo(() => {
+    const allText = subject + " " + bodyText + " " + bodyHtml + " " + templateHtml
+    return extractPlaceholders(allText)
+  }, [subject, bodyText, bodyHtml, templateHtml])
 
   if (!open) return null
 
@@ -163,13 +244,11 @@ export function ComposeDialog({
     setAttachmentError(null)
 
     for (const file of files) {
-      // Validate file size
       if (file.size > MAX_ATTACHMENT_SIZE) {
         setAttachmentError(`"${file.name}" exceeds the 25MB size limit`)
         continue
       }
 
-      // Validate file type
       if (!ALLOWED_FILE_TYPES.includes(file.type) && file.type !== "") {
         setAttachmentError(`"${file.name}" has an unsupported file type`)
         continue
@@ -192,12 +271,19 @@ export function ComposeDialog({
   const handleSend = async () => {
     setSending(true)
     try {
+      const finalSubject = replacePlaceholders(subject)
+      const htmlContent = isEditing
+        ? (contentRef.current?.innerHTML || editedHtml)
+        : editedHtml
+      const finalBody = templateHtml
+        ? replacePlaceholders(htmlContent || templateHtml)
+        : replacePlaceholders(bodyHtml || bodyText)
       await onSend({
         to: to.split(",").map((s) => s.trim()).filter(Boolean),
         cc: showCc ? cc.split(",").map((s) => s.trim()).filter(Boolean) : [],
         bcc: showBcc ? bcc.split(",").map((s) => s.trim()).filter(Boolean) : [],
-        subject,
-        body: bodyHtml || bodyText,
+        subject: finalSubject,
+        body: finalBody,
         fromAddress: fromAddresses[fromIndex]?.full || "",
         attachments: attachments.length > 0 ? attachments : undefined,
         inReplyTo: replyTo?.mode === "reply" || replyTo?.mode === "replyAll" ? replyTo.subject : undefined,
@@ -208,35 +294,44 @@ export function ComposeDialog({
   }
 
   const handleEditorChange = useCallback((html: string, text: string) => {
-    setBodyHtml(html)
+    if (!templateHtml) setBodyHtml(html)
     setBodyText(text)
-  }, [])
+  }, [templateHtml])
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const html = e.clipboardData.getData("text/html")
     if (html && /<(table|div|style|img|hr|center|font|span)[^>]*>/i.test(html)) {
       e.preventDefault()
       e.stopPropagation()
+      setTemplateHtml(html)
+      setEditedHtml(html)
       setBodyHtml(html)
       setBodyText(e.clipboardData.getData("text/plain") || html.replace(/<[^>]*>/g, ""))
-      setShowRichText(false)
+      setIsEditing(false)
     }
   }, [])
 
   if (minimized) {
     return (
-      <div className="fixed bottom-0 right-6 z-50">
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-t-lg shadow-lg w-80">
-          <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 dark:bg-gray-800 rounded-t-lg cursor-pointer" onClick={() => setMinimized(false)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") setMinimized(false) }} aria-label="Maximize compose window">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{subject || "New Message"}</span>
-            <button onClick={(e) => { e.stopPropagation(); onClose() }} aria-label="Discard draft"><X className="h-4 w-4 text-gray-400" /></button>
+      <div className="fixed right-0 top-1/4 z-50">
+        <div
+          onClick={() => setMinimized(false)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === "Enter") setMinimized(false) }}
+          aria-label="Maximize compose window"
+          className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-l-lg shadow-lg py-3 px-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+        >
+          <div className="flex flex-col items-center gap-2">
+            <Mail className="h-4 w-4 text-gray-500" />
+            <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 [writing-mode:vertical-rl] rotate-180">{subject || "New Message"}</span>
           </div>
         </div>
       </div>
     )
   }
 
-  const modeLabel = replyTo?.mode === "forward" ? "Fwd" : replyTo?.mode === "reply" || replyTo?.mode === "replyAll" ? "Reply" : "New Message"
+  const modeLabel = replyTo?.mode === "forward" ? "Forward" : replyTo?.mode === "reply" || replyTo?.mode === "replyAll" ? "Reply" : "New Message"
 
   return (
     <div
@@ -244,10 +339,10 @@ export function ComposeDialog({
       role="dialog"
       aria-modal="true"
       aria-label="Compose email"
-      className="fixed bottom-0 right-6 z-50 w-[560px] max-w-[calc(100vw-2rem)]"
+      className="fixed right-0 top-0 h-full z-50 w-[560px] max-w-[calc(100vw-2rem)] animate-[slideInFromRight_0.2s_ease-out]"
     >
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-t-xl shadow-2xl" onPaste={handlePaste}>
-        <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-t-xl border-b border-gray-100 dark:border-gray-700">
+      <div className="flex flex-col h-full bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-2xl" onPaste={handlePaste}>
+        <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 shrink-0">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{modeLabel}</span>
           <div className="flex items-center gap-1">
             <button onClick={() => setMinimized(true)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded" aria-label="Minimize compose window"><Minus className="h-3.5 w-3.5 text-gray-500" /></button>
@@ -255,10 +350,10 @@ export function ComposeDialog({
           </div>
         </div>
 
-        <div className="px-4 py-2 space-y-3">
+        <div className="flex-1 overflow-y-auto px-4 py-2 space-y-3">
           {fromAddresses.length > 0 && (
             <div className="flex items-center gap-2">
-              <label htmlFor="compose-from" className="text-xs font-medium text-gray-500 w-8">From</label>
+              <label htmlFor="compose-from" className="text-xs font-medium text-gray-500 w-8 shrink-0">From</label>
               <Select
                 id="compose-from"
                 value={String(fromIndex)}
@@ -273,7 +368,7 @@ export function ComposeDialog({
           )}
 
           <div className="flex items-center gap-2">
-            <label htmlFor="compose-to" className="text-xs font-medium text-gray-500 w-8">To</label>
+            <label htmlFor="compose-to" className="text-xs font-medium text-gray-500 w-8 shrink-0">To</label>
             <Input
               id="compose-to"
               value={to}
@@ -289,14 +384,14 @@ export function ComposeDialog({
 
           {showCc && (
             <div className="flex items-center gap-2">
-              <label htmlFor="compose-cc" className="text-xs font-medium text-gray-500 w-8">Cc</label>
+              <label htmlFor="compose-cc" className="text-xs font-medium text-gray-500 w-8 shrink-0">Cc</label>
               <Input id="compose-cc" value={cc} onChange={(e) => setCc(e.target.value)} placeholder="Cc recipients" className="border-0 border-b border-gray-100 dark:border-gray-700 rounded-none px-0 h-8 text-sm focus:ring-0" />
             </div>
           )}
 
           {showBcc && (
             <div className="flex items-center gap-2">
-              <label htmlFor="compose-bcc" className="text-xs font-medium text-gray-500 w-8">Bcc</label>
+              <label htmlFor="compose-bcc" className="text-xs font-medium text-gray-500 w-8 shrink-0">Bcc</label>
               <Input id="compose-bcc" value={bcc} onChange={(e) => setBcc(e.target.value)} placeholder="Bcc recipients" className="border-0 border-b border-gray-100 dark:border-gray-700 rounded-none px-0 h-8 text-sm focus:ring-0" />
             </div>
           )}
@@ -304,27 +399,62 @@ export function ComposeDialog({
           <label htmlFor="compose-subject" className="sr-only">Subject</label>
           <Input id="compose-subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className="border-0 border-b border-gray-100 dark:border-gray-700 rounded-none px-0 h-8 text-sm font-medium focus:ring-0" />
 
-          {showRichText ? (
-            <RichEditor value={bodyText} onChange={handleEditorChange} placeholder="Write your message..." />
-          ) : bodyHtml ? (
+          {placeholders.length > 0 && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3 py-2 space-y-2">
+              <p className="text-xs font-medium text-blue-700 dark:text-blue-400">Template Variables</p>
+              <div className="grid grid-cols-2 gap-2">
+                {placeholders.map((p) => (
+                  <Input
+                    key={p}
+                    value={placeholderValues[p] || ""}
+                    onChange={(e) => setPlaceholderValues(prev => ({ ...prev, [p]: e.target.value }))}
+                    placeholder={`{${p}}`}
+                    className="h-7 text-xs border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 rounded"
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {templateHtml && !isEditing ? (
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
               <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-                <span className="text-xs font-medium text-gray-500">HTML Template</span>
+                <span className="text-xs font-medium text-gray-500">Template Preview</span>
                 <button
                   type="button"
-                  onClick={() => { setShowRichText(true); setBodyHtml("") }}
+                  onClick={() => { setEditedHtml(e => e || templateHtml); setIsEditing(true) }}
                   className="text-xs text-blue-600 hover:text-blue-700"
                 >
-                  Edit as Rich Text
+                  Edit Content
                 </button>
               </div>
               <div
-                ref={editorRef}
-                className="p-3 max-h-[300px] overflow-y-auto text-sm"
-                dangerouslySetInnerHTML={{ __html: bodyHtml }}
+                className="p-3 text-sm [&_table]:max-w-full"
+                dangerouslySetInnerHTML={{ __html: replacePlaceholders(editedHtml || templateHtml) }}
               />
             </div>
-          ) : null}
+          ) : templateHtml && isEditing ? (
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                <span className="text-xs font-medium text-gray-500">Editing Template</span>
+                <button
+                  type="button"
+                  onClick={() => { setEditedHtml(contentRef.current?.innerHTML || editedHtml); setIsEditing(false) }}
+                  className="text-xs text-blue-600 hover:text-blue-700"
+                >
+                  Done
+                </button>
+              </div>
+              <div
+                ref={contentRef}
+                suppressContentEditableWarning
+                className="p-3 text-sm [&_table]:max-w-full focus:outline-none"
+                dangerouslySetInnerHTML={{ __html: editedHtml }}
+              />
+            </div>
+          ) : (
+            <RichEditor value={bodyText} onChange={handleEditorChange} placeholder="Write your message..." />
+          )}
 
           {attachmentError && (
             <p className="text-xs text-red-500" role="alert">{attachmentError}</p>
@@ -345,7 +475,7 @@ export function ComposeDialog({
           )}
         </div>
 
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700 shrink-0">
           <div className="flex items-center gap-2">
             <Button onClick={handleSend} disabled={sending || !to.trim()} className="gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60" aria-label="Send email">
               {sending ? (
@@ -380,7 +510,7 @@ export function ComposeDialog({
                       {templates.map(t => (
                         <button
                           key={t.id}
-                          onClick={() => insertTemplate(t)}
+                          onClick={() => handleTemplateSelect(t.id)}
                           className="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 truncate"
                           role="option"
                         >

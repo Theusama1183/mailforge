@@ -17,4 +17,7 @@ CREATE POLICY "Users can manage own templates"
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
 
-ALTER PUBLICATION supabase_realtime ADD TABLE IF NOT EXISTS public.templates;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.templates;
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;

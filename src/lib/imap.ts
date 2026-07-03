@@ -71,14 +71,16 @@ export async function syncMailbox(config: ImapConfig, mailbox: string, sinceUid:
         source: true,
       })) {
         const parsed = await simpleParser(msg.source!)
+        const formatAddresses = (addr: any) =>
+          addr ? (Array.isArray(addr) ? addr.map((a: any) => a.text).filter(Boolean).join(", ") : addr.text) : ""
         messages.push({
           uid: msg.uid,
           messageId: parsed.messageId || "",
           inReplyTo: parsed.inReplyTo || "",
           references: parsed.references || "",
-          from: parsed.from ? (Array.isArray(parsed.from) ? parsed.from[0]?.text || "" : parsed.from.text) : "",
-          to: parsed.to ? (Array.isArray(parsed.to) ? parsed.to[0]?.text || "" : parsed.to.text) : "",
-          cc: parsed.cc ? (Array.isArray(parsed.cc) ? parsed.cc[0]?.text || "" : parsed.cc.text) : "",
+          from: formatAddresses(parsed.from),
+          to: formatAddresses(parsed.to),
+          cc: formatAddresses(parsed.cc),
           subject: parsed.subject || "",
           bodyHtml: typeof parsed.html === "string" ? parsed.html : "",
           bodyText: parsed.text || "",
