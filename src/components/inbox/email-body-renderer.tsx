@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
-import { formatPlainTextBody, decodeMimeSubject } from "@/lib/email-utils"
+import { formatPlainTextBody, decodeMimeSubject, stripInvisibleChars } from "@/lib/email-utils"
 import { FileText, Code } from "lucide-react"
 
 interface EmailBodyRendererProps {
@@ -99,7 +99,7 @@ export function EmailBodyRenderer({ bodyHtml, bodyText, subject }: EmailBodyRend
           {/* Raw text view */}
           {showRaw || (!hasHtml && hasText) ? (
             <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-sans leading-relaxed break-words">
-              {bodyText || ""}
+              {stripInvisibleChars(bodyText || "")}
             </pre>
           ) : null}
         </div>
@@ -201,14 +201,14 @@ function sanitizeHtml(html: string): string {
           }
         }
       })
-      return doc.body.innerHTML
+      return stripInvisibleChars(doc.body.innerHTML)
     } catch {
       // Fall through to regex-based sanitization
     }
   }
 
   // Fallback: regex-based sanitization
-  return html
+  return stripInvisibleChars(html
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
     .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, "")
     .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, "")
@@ -218,5 +218,5 @@ function sanitizeHtml(html: string): string {
     .replace(/\son\w+\s*=\s*'[^']*'/gi, "")
     .replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
     .replace(/href=["']javascript:["']/gi, "")
-    .replace(/href=["']vbscript:["']/gi, "")
+    .replace(/href=["']vbscript:["']/gi, ""))
 }

@@ -48,23 +48,27 @@ export function Sidebar({
   // Fetch unread counts for all folders
   useEffect(() => {
     async function fetchUnreadCounts() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase
-        .from("emails")
-        .select("folder, read, starred")
-        .eq("user_id", user.id)
-      if (data) {
-        const counts: Record<string, number> = {}
-        for (const email of data) {
-          if (email.folder && !email.read) {
-            counts[email.folder] = (counts[email.folder] || 0) + 1
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const { data } = await supabase
+          .from("emails")
+          .select("folder, read, starred")
+          .eq("user_id", user.id)
+        if (data) {
+          const counts: Record<string, number> = {}
+          for (const email of data) {
+            if (email.folder && !email.read) {
+              counts[email.folder] = (counts[email.folder] || 0) + 1
+            }
+            if (email.starred) {
+              counts.starred = (counts.starred || 0) + 1
+            }
           }
-          if (email.starred) {
-            counts.starred = (counts.starred || 0) + 1
-          }
+          setLocalUnread(counts)
         }
-        setLocalUnread(counts)
+      } catch {
+        // Silently handle fetch errors
       }
     }
     fetchUnreadCounts()

@@ -53,7 +53,8 @@ export function decodeMimeSubject(subject: string | null | undefined): string {
 export function formatPlainTextBody(text: string | null | undefined): string {
   if (!text) return ""
 
-  const lines = text.split(/\r?\n/)
+  const cleaned = stripInvisibleChars(text)
+  const lines = cleaned.split(/\r?\n/)
   const parts: string[] = []
   let inBlock = false
 
@@ -227,11 +228,28 @@ export function formatAddress(address: string, maxLen = 48): string {
 }
 
 /**
+ * Clean a sender display name by stripping embedded email addresses
+ * like `"ClickUp Team" <team@mail.clickup.com>` → `ClickUp Team`
+ */
+export function cleanSenderName(name: string): string {
+  return name.replace(/\s*<[^>]+>\s*$/, "").replace(/^["']|["']$/g, "").trim() || name
+}
+
+/**
+ * Strip invisible / zero-width Unicode characters from text.
+ * These are commonly used by email senders for tracking / formatting
+ * and cause garbled-looking snippets.
+ */
+export function stripInvisibleChars(str: string): string {
+  return str.replace(/[\u200B-\u200F\u2028-\u202F\u2060-\u2064\uFEFF\u034F\u00AD\u2000-\u200A]+/g, " ").trim()
+}
+
+/**
  * Truncate a string to a given length with ellipsis.
  */
 export function truncateText(str: string, len = 80): string {
   if (!str) return ""
-  const cleaned = str.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim()
+  const cleaned = stripInvisibleChars(str.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim())
   if (cleaned.length <= len) return cleaned
   return cleaned.slice(0, len).trimEnd() + "…"
 }

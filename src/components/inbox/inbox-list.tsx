@@ -9,8 +9,13 @@ import type { Email } from "@/types"
 interface InboxListProps {
   emails: Email[]
   selectedId?: string
+  selectedIds?: Set<string>
   onSelect: (id: string) => void
   onStar: (id: string, starred: boolean) => void
+  onArchive: (id: string) => void
+  onDelete: (id: string) => void
+  onToggleRead: (id: string, read: boolean) => void
+  onToggleSelection?: (id: string) => void
   threadCounts?: Record<string, number>
   loading?: boolean
   currentFolder?: string
@@ -26,15 +31,16 @@ const EMPTY_LIST_CONFIG: Record<string, { icon: React.ComponentType<{ className?
   trash: { icon: Trash2, title: "Trash is empty", subtitle: "Deleted emails will appear here" },
 }
 
-/**
- * Email list with loading, empty, and populated states.
- * Supports keyboard navigation and auto-scrolls selected item into view.
- */
 export function InboxList({
   emails,
   selectedId,
+  selectedIds,
   onSelect,
   onStar,
+  onArchive,
+  onDelete,
+  onToggleRead,
+  onToggleSelection,
   threadCounts = {},
   loading = false,
   currentFolder = "inbox",
@@ -42,14 +48,12 @@ export function InboxList({
   const containerRef = useRef<HTMLDivElement>(null)
   const selectedRef = useRef<HTMLDivElement>(null)
 
-  // Scroll selected item into view
   useEffect(() => {
     if (selectedRef.current) {
       selectedRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" })
     }
   }, [selectedId])
 
-  // Keyboard navigation
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       const currentIndex = selectedId
@@ -73,7 +77,6 @@ export function InboxList({
     [emails, selectedId, onSelect]
   )
 
-  // Loading state
   if (loading) {
     return (
       <div className="flex-1 overflow-y-auto" ref={containerRef}>
@@ -93,7 +96,6 @@ export function InboxList({
     )
   }
 
-  // Empty state
   if (emails.length === 0) {
     const config = EMPTY_LIST_CONFIG[currentFolder] || EMPTY_LIST_CONFIG.inbox
     const Icon = config.icon
@@ -137,9 +139,14 @@ export function InboxList({
               email={email}
               isSelected={email.id === selectedId}
               isUnread={!email.read}
+              isChecked={selectedIds?.has(email.id) ?? false}
               threadCount={threadCounts[email.id]}
               onSelect={onSelect}
               onStar={onStar}
+              onArchive={onArchive}
+              onDelete={onDelete}
+              onToggleRead={onToggleRead}
+              onToggleCheck={onToggleSelection}
             />
           </div>
         )

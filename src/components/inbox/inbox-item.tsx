@@ -1,35 +1,46 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useState } from "react"
 import { cn } from "@/lib/utils"
-import { decodeMimeSubject, truncateText } from "@/lib/email-utils"
-import { Star } from "lucide-react"
+import { decodeMimeSubject, truncateText, cleanSenderName } from "@/lib/email-utils"
+import { Star, Archive, Trash2, MailOpen, Mail, Check } from "lucide-react"
 import type { Email } from "@/types"
 
 interface InboxItemProps {
   email: Email
   isSelected: boolean
   isUnread: boolean
+  isChecked: boolean
   threadCount?: number
   onSelect: (id: string) => void
   onStar: (id: string, starred: boolean) => void
+  onArchive: (id: string) => void
+  onDelete: (id: string) => void
+  onToggleRead: (id: string, read: boolean) => void
+  onToggleCheck?: (id: string) => void
 }
 
 export function InboxItem({
   email,
   isSelected,
   isUnread,
+  isChecked,
   threadCount,
   onSelect,
   onStar,
+  onArchive,
+  onDelete,
+  onToggleRead,
+  onToggleCheck,
 }: InboxItemProps) {
+  const [hovering, setHovering] = useState(false)
+
   const handleSelect = useCallback(() => {
     if (window.getSelection()?.toString()) return
     onSelect(email.id)
   }, [email.id, onSelect])
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      // Activate on Enter or Space (same as button behavior)
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault()
         onSelect(email.id)
@@ -55,8 +66,47 @@ export function InboxItem({
     [email.id, email.starred, onStar]
   )
 
+  const handleArchive = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      onArchive(email.id)
+    },
+    [email.id, onArchive]
+  )
+  const handleDelete = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      onDelete(email.id)
+    },
+    [email.id, onDelete]
+  )
+  const handleToggleRead = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      onToggleRead(email.id, email.read)
+    },
+    [email.id, email.read, onToggleRead]
+  )
+  const handleCheck = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      onToggleCheck?.(email.id)
+    },
+    [email.id, onToggleCheck]
+  )
+  const handleCheckKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      e.stopPropagation()
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault()
+        onToggleCheck?.(email.id)
+      }
+    },
+    [email.id, onToggleCheck]
+  )
+
   const decodedSubject = decodeMimeSubject(email.subject)
-  const senderName = email.from_name || email.from_address || "Unknown"
+  const senderName = cleanSenderName(email.from_name || email.from_address || "Unknown")
   const snippet = truncateText(email.body_text || email.body_html || "", 100)
   const time = formatShortTime(email.created_at)
 
@@ -64,6 +114,8 @@ export function InboxItem({
     <div
       onClick={handleSelect}
       onKeyDown={handleKeyDown}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
       role="button"
       tabIndex={0}
       className={cn(
@@ -76,8 +128,32 @@ export function InboxItem({
       aria-current={isSelected ? "true" : undefined}
       aria-label={`${isUnread ? "Unread" : "Read"} email from ${senderName}: ${decodedSubject}`}
     >
-      <div className="flex items-start gap-2">
-        {/* Sender name + Star column */}
+      <div className="flex items-start gap-1">
+        {/* Checkbox */}
+        <div
+          className={cn(
+            "flex-shrink-0 pt-2.5 pl-0.5 transition-opacity duration-150",
+            hovering || isChecked ? "opacity-100" : "opacity-0"
+          )}
+        >
+          <div
+            onClick={handleCheck}
+            onKeyDown={handleCheckKeyDown}
+            role="checkbox"
+            aria-checked={isChecked}
+            tabIndex={0}
+            className={cn(
+              "w-4 h-4 rounded border flex items-center justify-center cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+              isChecked
+                ? "bg-blue-500 border-blue-500"
+                : "border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500"
+            )}
+          >
+            {isChecked && <Check className="h-3 w-3 text-white" />}
+          </div>
+        </div>
+
+        {/* Main content */}
         <div className="flex-1 min-w-0">
           {/* Sender row */}
           <div className="flex items-center gap-2 mb-0.5">
@@ -118,11 +194,43 @@ export function InboxItem({
           </div>
         </div>
 
-        {/* Right column: time + star */}
-        <div className="flex flex-col items-end gap-1 flex-shrink-0">
-          <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
-            {time}
-          </span>
+        {/* Right column: time (default) / hover actions */}
+        <div className="flex flex-col items-end gap-1 flex-shrink-0 relative w-[72px]">
+          {hovering ? (
+            <div className="flex items-center gap-0.5">
+              <button
+                onClick={handleArchive}
+                type="button"
+                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                aria-label="Archive"
+                title="Archive"
+              >
+                <Archive className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={handleDelete}
+                type="button"
+                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-red-500 transition-colors"
+                aria-label="Delete"
+                title="Delete"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={handleToggleRead}
+                type="button"
+                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-blue-500 transition-colors"
+                aria-label={isUnread ? "Mark as read" : "Mark as unread"}
+                title={isUnread ? "Mark as read" : "Mark as unread"}
+              >
+                {isUnread ? <MailOpen className="h-3.5 w-3.5" /> : <Mail className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          ) : (
+            <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap mt-0.5">
+              {time}
+            </span>
+          )}
           <button
             onClick={handleStar}
             onKeyDown={handleStarKeyDown}
@@ -146,12 +254,6 @@ export function InboxItem({
   )
 }
 
-/**
- * Format a date string into a short display.
- * Today → "3:45 PM"
- * This year → "Jan 12"
- * Older → "Jan 12, 2023"
- */
 function formatShortTime(dateStr: string | null | undefined): string {
   if (!dateStr) return ""
   try {

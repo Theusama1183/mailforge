@@ -78,13 +78,17 @@ export function ComposeDialog({
       ? `Re: ${replyTo.subject}`
       : ""
   )
-  const [bodyHtml, setBodyHtml] = useState("")
+  const [bodyHtml, setBodyHtml] = useState(
+    replyTo?.body && replyTo.body.trim().startsWith("<") ? replyTo.body : ""
+  )
   const [templateHtml, setTemplateHtml] = useState("")
   const [bodyText, setBodyText] = useState(
-    replyTo?.mode === "forward"
-      ? `\n\n---------- Forwarded message ---------\n${replyTo.body}`
-      : replyTo?.body
-      ? `\n\n---\n${replyTo.body}`
+    replyTo?.body
+      ? replyTo.body.trim().startsWith("<")
+        ? replyTo.body
+        : replyTo.mode === "forward"
+          ? `\n\n---------- Forwarded message ---------\n${replyTo.body}`
+          : `\n\n---\n${replyTo.body}`
       : ""
   )
   const [minimized, setMinimized] = useState(false)

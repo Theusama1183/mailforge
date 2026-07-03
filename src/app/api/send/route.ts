@@ -1,24 +1,29 @@
 import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/supabase/api-client"
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { sendEmail } from "@/lib/send"
 
 export async function POST(req: Request) {
   try {
-    const { to, cc, bcc, subject, body, fromAddress, userId, attachments, inReplyTo } = await req.json()
+    const { to, cc, bcc, subject, body, fromAddress, attachments, inReplyTo } = await req.json()
 
-    if (!to?.length || !subject || !userId) {
+    if (!to?.length || !subject) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    // Authenticate and verify the userId matches the authenticated user
+    // Authenticate
     const auth = await getAuthUser(req)
 
     if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { user, supabase  } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    if (user.id !== userId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
+    const userId = user.id
+
+    const rl = checkRateLimit(`send:${user.id}`, RATE_LIMITS.send)
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Too many requests. Please wait before sending more emails." }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } })
     }
 
     const { data: domains } = await supabase

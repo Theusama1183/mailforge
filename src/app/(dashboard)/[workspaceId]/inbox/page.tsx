@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { InboxList } from "@/components/inbox/inbox-list"
-import { EmailViewer } from "@/components/inbox/email-viewer"
+import { InboxToolbar } from "@/components/inbox/inbox-toolbar"
+import type { SelectType } from "@/components/inbox/inbox-toolbar"
 import { ComposeDialog } from "@/components/compose/compose-dialog"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ChevronDown, Mail, Search as SearchIcon, Send, Star, Archive, Trash2, FileText, AlertTriangle } from "lucide-react"
+import { ChevronDown, Mail, Search as SearchIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { toast } from "sonner"
@@ -18,21 +19,18 @@ import type { Email } from "@/types"
 
 export const dynamic = "force-dynamic"
 
-type ComposeMode = "new" | "reply" | "replyAll" | "forward"
-
 export default function DashboardPage() {
   const [currentFolder, setCurrentFolder] = useState("inbox")
   const [emails, setEmails] = useState<Email[]>([])
-  const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null)
   const [showCompose, setShowCompose] = useState(false)
-  const [composeMode, setComposeMode] = useState<ComposeMode>("new")
-  const [replyTarget, setReplyTarget] = useState<Email | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedAddress, setSelectedAddress] = useState("all")
   const [showAddressDropdown, setShowAddressDropdown] = useState(false)
-  const [prevEmailCount, setPrevEmailCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState("")
   const [showSearch, setShowSearch] = useState(false)
+  const [page, setPage] = useState(0)
+  const [totalCount, setTotalCount] = useState(0)
+  const pageSize = 50
   const searchInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -56,19 +54,15 @@ export default function DashboardPage() {
     if (compose) setShowCompose(true)
   }, [searchParams])
 
-  const selectedEmail = useMemo(
-    () => emails.find((e) => e.id === selectedEmailId),
-    [emails, selectedEmailId]
-  )
+  // Reset pagination on folder/address change
+  useEffect(() => {
+    setPage(0)
+  }, [currentFolder, selectedAddress])
 
-  // Data fetching
+  // Data fetching via API (server-side pagination with rate limiting)
   const fetchEmails = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push("/login")
-        return
-      }
+      setLoading(true)
 
       // Fetch from addresses via workspace API (works for members too)
       if (fromAddresses.length === 0 && workspaceId) {
@@ -87,45 +81,33 @@ export default function DashboardPage() {
         } catch {}
       }
 
-      const folder = currentFolder === "inbox" ? "inbox" :
-                     currentFolder === "starred" ? "starred" :
-                     currentFolder === "sent" ? "sent" : currentFolder
-
-      let query = supabase
-        .from("emails")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-
-      if (folder !== "starred") {
-        query = query.eq("folder", folder)
-      } else {
-        query = query.eq("starred", true)
-      }
-
+      const params = new URLSearchParams({
+        folder: currentFolder,
+        limit: String(pageSize),
+        offset: String(page * pageSize),
+      })
       if (selectedAddress !== "all") {
-        query = query.eq("mailbox_address", selectedAddress)
+        params.set("address", selectedAddress)
       }
 
-      const { data } = await query
+      const res = await fetch(`/api/emails?${params}`)
 
-      if (data) {
-        if (prevEmailCount > 0 && data.length > prevEmailCount) {
-          const newCount = data.length - prevEmailCount
-          toast(`${newCount} new email(s)`, {
-            description: decodeMimeSubject(data[0]?.subject) || "Received in inbox",
-            icon: <Mail className="h-4 w-4 text-blue-500" />,
-          })
-        }
-        setPrevEmailCount(data.length)
-        setEmails(data as Email[])
+      if (res.status === 429) {
+        toast.error("Too many requests. Please wait.")
+        return
       }
+
+      if (!res.ok) throw new Error("Failed to fetch")
+
+      const data = await res.json()
+      setEmails(data.emails || [])
+      setTotalCount(data.count || 0)
     } catch (err) {
       console.error("Error fetching emails:", err)
     } finally {
       setLoading(false)
     }
-  }, [currentFolder, selectedAddress, supabase, router, prevEmailCount, fromAddresses.length, workspaceId])
+  }, [currentFolder, selectedAddress, page, pageSize, fromAddresses.length, workspaceId])
 
   useEffect(() => {
     fetchEmails()
@@ -175,31 +157,7 @@ export default function DashboardPage() {
   const searchResults = useEmailSearch(emails, searchQuery)
   const displayEmails = searchResults ?? threadedEmails
 
-  // Keyboard shortcuts via extracted hook
-  const shortcuts = useMemo(
-    () => ({
-      c: () => {
-        setComposeMode("new")
-        setReplyTarget(null)
-        setShowCompose(true)
-      },
-      r: () => {
-        if (selectedEmail) {
-          setReplyTarget(selectedEmail)
-          setComposeMode("reply")
-          setShowCompose(true)
-        }
-      },
-      Escape: () => {
-        setShowSearch(false)
-        setSearchQuery("")
-        setShowAddressDropdown(false)
-      },
-    }),
-    [selectedEmail]
-  )
-
-  // Ctrl+F shortcut (separate because it needs metaKey/ctrlKey check)
+  // Ctrl+F shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "f") {
@@ -212,18 +170,30 @@ export default function DashboardPage() {
     return () => window.removeEventListener("keydown", handler)
   }, [])
 
+  // Keyboard shortcuts
+  const shortcuts = useMemo(
+    () => ({
+      c: () => {
+        setShowCompose(true)
+      },
+      Escape: () => {
+        setShowSearch(false)
+        setSearchQuery("")
+        setShowAddressDropdown(false)
+      },
+    }),
+    []
+  )
+
   useKeyboardShortcuts(shortcuts)
 
   // Action handlers
   const handleSend = async (data: { to: string[]; cc: string[]; bcc: string[]; subject: string; body: string; fromAddress: string; attachments?: { filename: string; content: string }[]; inReplyTo?: string }) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
       const res = await fetch("/api/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, userId: user.id }),
+        body: JSON.stringify({ ...data }),
       })
 
       if (!res.ok) {
@@ -234,8 +204,6 @@ export default function DashboardPage() {
       const { id } = await res.json()
 
       setShowCompose(false)
-      setReplyTarget(null)
-      setComposeMode("new")
       fetchEmails()
 
       toast("Message sent", {
@@ -256,18 +224,185 @@ export default function DashboardPage() {
   }
 
   const handleStar = async (id: string, starred: boolean) => {
-    await supabase.from("emails").update({ starred }).eq("id", id)
-    setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, starred } : e)))
+    const res = await fetch(`/api/emails/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ starred }),
+    })
+    if (res.status === 429) { toast.error("Too many requests"); return }
+    if (res.ok) {
+      setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, starred } : e)))
+    }
   }
 
   const handleSelect = async (id: string) => {
-    setSelectedEmailId(id)
     const email = emails.find((e) => e.id === id)
     if (email && !email.read) {
-      await supabase.from("emails").update({ read: true }).eq("id", id)
-      setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, read: true } : e)))
+      const res = await fetch(`/api/emails/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ read: true }),
+      })
+      if (res.ok) {
+        setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, read: true } : e)))
+      }
+    }
+    router.push(`/${workspaceId}/inbox/${id}`)
+  }
+
+  const handleArchive = async (id: string) => {
+    const res = await fetch(`/api/emails/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folder: "archive" }),
+    })
+    if (res.status === 429) { toast.error("Too many requests"); return }
+    if (res.ok) {
+      setEmails((prev) => prev.filter((e) => e.id !== id))
     }
   }
+
+  const handleDelete = async (id: string) => {
+    const res = await fetch(`/api/emails/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folder: "trash" }),
+    })
+    if (res.status === 429) { toast.error("Too many requests"); return }
+    if (res.ok) {
+      setEmails((prev) => prev.filter((e) => e.id !== id))
+    }
+  }
+
+  const handleToggleRead = async (id: string, wasRead: boolean) => {
+    const res = await fetch(`/api/emails/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ read: !wasRead }),
+    })
+    if (res.status === 429) { toast.error("Too many requests"); return }
+    if (res.ok) {
+      setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, read: !wasRead } : e)))
+    }
+  }
+
+  // Selection state for toolbar
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const handleToggleSelection = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const handleSelectType = useCallback(
+    (type: SelectType) => {
+      setSelectedIds(() => {
+        switch (type) {
+          case "all":
+            return new Set(displayEmails.map((e) => e.id))
+          case "none":
+            return new Set()
+          case "read":
+            return new Set(displayEmails.filter((e) => e.read).map((e) => e.id))
+          case "unread":
+            return new Set(displayEmails.filter((e) => !e.read).map((e) => e.id))
+          case "starred":
+            return new Set(displayEmails.filter((e) => e.starred).map((e) => e.id))
+          case "unstarred":
+            return new Set(displayEmails.filter((e) => !e.starred).map((e) => e.id))
+          default:
+            return new Set()
+        }
+      })
+    },
+    [displayEmails]
+  )
+
+  const handleBulkArchive = useCallback(async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    const res = await fetch("/api/emails", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, updates: { folder: "archive" } }),
+    })
+    if (res.status === 429) { toast.error("Too many requests"); return }
+    if (res.ok) {
+      setEmails((prev) => prev.filter((e) => !selectedIds.has(e.id)))
+      setSelectedIds(new Set())
+    } else {
+      const err = await res.json()
+      toast.error(err.error || "Failed to archive")
+    }
+  }, [selectedIds])
+
+  const handleBulkDelete = useCallback(async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    const res = await fetch("/api/emails", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    })
+    if (res.status === 429) { toast.error("Too many requests"); return }
+    if (res.ok) {
+      setEmails((prev) => prev.filter((e) => !selectedIds.has(e.id)))
+      setSelectedIds(new Set())
+    } else {
+      const err = await res.json()
+      toast.error(err.error || "Failed to delete")
+    }
+  }, [selectedIds])
+
+  const handleBulkToggleRead = useCallback(async () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    const hasUnread = ids.some((id) => {
+      const email = emails.find((e) => e.id === id)
+      return email && !email.read
+    })
+    const newRead = !hasUnread
+    const res = await fetch("/api/emails", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids, updates: { read: newRead } }),
+    })
+    if (res.status === 429) { toast.error("Too many requests"); return }
+    if (res.ok) {
+      setEmails((prev) =>
+        prev.map((e) => (selectedIds.has(e.id) ? { ...e, read: newRead } : e))
+      )
+    } else {
+      const err = await res.json()
+      toast.error(err.error || "Failed to update")
+    }
+  }, [selectedIds, emails])
+
+  const hasUnreadSelected = useMemo(
+    () =>
+      Array.from(selectedIds).some((id) => {
+        const email = emails.find((e) => e.id === id)
+        return email && !email.read
+      }),
+    [selectedIds, emails]
+  )
+
+  const handleRefresh = useCallback(() => {
+    setPage(0)
+    fetchEmails()
+  }, [fetchEmails])
+
+  const handlePrevPage = useCallback(() => {
+    setPage((p) => Math.max(0, p - 1))
+  }, [])
+
+  const handleNextPage = useCallback(() => {
+    setPage((p) => p + 1)
+  }, [])
 
   const handleFolderChange = (folder: string) => {
     if (["settings", "analytics", "templates", "imap-sync", "workspaces"].includes(folder)) {
@@ -282,7 +417,7 @@ export default function DashboardPage() {
       return
     }
     setCurrentFolder(folder)
-    setSelectedEmailId(null)
+    setPage(0)
     router.push(`/${workspaceId}/inbox?folder=${folder}`, { scroll: false })
   }
 
@@ -311,7 +446,7 @@ export default function DashboardPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => { setComposeMode("new"); setReplyTarget(null); setShowCompose(true) }}
+              onClick={() => setShowCompose(true)}
               className="md:hidden"
               aria-label="New message"
             >
@@ -385,140 +520,48 @@ export default function DashboardPage() {
         </div>
       )}
 
+      <InboxToolbar
+        totalCount={totalCount}
+        visibleCount={displayEmails.length}
+        selectedCount={selectedIds.size}
+        hasUnreadSelected={hasUnreadSelected}
+        page={page}
+        pageSize={pageSize}
+        onSelect={handleSelectType}
+        onArchiveSelected={handleBulkArchive}
+        onDeleteSelected={handleBulkDelete}
+        onToggleReadSelected={handleBulkToggleRead}
+        onRefresh={handleRefresh}
+        onPrevPage={handlePrevPage}
+        onNextPage={handleNextPage}
+      />
+
       <div className="flex-1 flex overflow-hidden">
-        <div
-          className={`${selectedEmailId ? "hidden md:flex" : "flex"} flex-col w-full md:w-96 md:border-r border-gray-100 dark:border-gray-800 overflow-y-auto`}
-          role="region"
-          aria-label="Email list panel"
-        >
+        <div className="flex flex-col w-full overflow-y-auto">
           <InboxList
             emails={displayEmails}
-            selectedId={selectedEmailId ?? undefined}
+            selectedId={undefined}
+            selectedIds={selectedIds}
             onSelect={handleSelect}
             onStar={handleStar}
+            onArchive={handleArchive}
+            onDelete={handleDelete}
+            onToggleRead={handleToggleRead}
+            onToggleSelection={handleToggleSelection}
             threadCounts={threadCounts}
             loading={loading}
             currentFolder={currentFolder}
           />
         </div>
-
-        <div
-          className={`${!selectedEmailId ? "hidden md:flex" : "flex"} flex-1 flex-col overflow-hidden`}
-          role="region"
-          aria-label="Email content panel"
-        >
-          {selectedEmail ? (
-            <EmailViewer
-              email={selectedEmail}
-              onReply={() => {
-                setReplyTarget(selectedEmail)
-                setComposeMode("reply")
-                setShowCompose(true)
-              }}
-              onReplyAll={() => {
-                setReplyTarget(selectedEmail)
-                setComposeMode("replyAll")
-                setShowCompose(true)
-              }}
-              onForward={() => {
-                setReplyTarget(selectedEmail)
-                setComposeMode("forward")
-                setShowCompose(true)
-              }}
-              onBack={() => setSelectedEmailId(null)}
-              onStar={() => handleStar(selectedEmail.id, !selectedEmail.starred)}
-              onDelete={async () => {
-                await supabase.from("emails").update({ folder: "trash" }).eq("id", selectedEmail.id)
-                setSelectedEmailId(null)
-                fetchEmails()
-              }}
-              onArchive={async () => {
-                await supabase.from("emails").update({ folder: "archive" }).eq("id", selectedEmail.id)
-                setSelectedEmailId(null)
-                fetchEmails()
-              }}
-            />
-          ) : (
-            <EmptyEmailDetail folder={currentFolder} />
-          )}
-        </div>
       </div>
 
       <ComposeDialog
         open={showCompose}
-        onClose={() => {
-          setShowCompose(false)
-          setReplyTarget(null)
-          setComposeMode("new")
-        }}
+        onClose={() => setShowCompose(false)}
         onSend={handleSend}
         fromAddresses={fromAddresses}
-        replyTo={replyTarget ? {
-          to: composeMode === "forward" ? "" : (composeMode === "replyAll" ? [replyTarget.from_address, ...(replyTarget.cc_addresses || [])].join(", ") : replyTarget.from_address),
-          subject: replyTarget.subject || "",
-          body: replyTarget.body_text || replyTarget.body_html?.replace(/<[^>]*>/g, "").trim() || "",
-          mode: composeMode,
-        } : undefined}
-        key={showCompose ? (replyTarget?.id || "new") : "closed"}
+        key={showCompose ? "new" : "closed"}
       />
     </>
   )
-}
-
-/**
- * Contextual empty state for the email detail panel.
- * Shows a different message depending on the current folder.
- */
-function EmptyEmailDetail({ folder }: { folder: string }) {
-  const config = EMPTY_DETAIL_CONFIG[folder] || EMPTY_DETAIL_CONFIG.inbox
-
-  return (
-    <div className="flex items-center justify-center h-full text-gray-400">
-      <div className="text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
-          <config.icon className="h-8 w-8 text-gray-300 dark:text-gray-600" aria-hidden="true" />
-        </div>
-        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{config.title}</p>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{config.subtitle}</p>
-      </div>
-    </div>
-  )
-}
-
-const EMPTY_DETAIL_CONFIG: Record<string, { icon: React.ComponentType<{ className?: string }>; title: string; subtitle: string }> = {
-  inbox: {
-    icon: Mail,
-    title: "Select an email to read",
-    subtitle: "Choose from your inbox",
-  },
-  sent: {
-    icon: Send,
-    title: "Select a sent email",
-    subtitle: "View your sent messages",
-  },
-  drafts: {
-    icon: FileText,
-    title: "Select a draft",
-    subtitle: "Continue editing your drafts",
-  },
-  starred: {
-    icon: Star,
-    title: "Select a starred email",
-    subtitle: "View your bookmarked messages",
-  },
-  archive: {
-    icon: Archive,
-    title: "Select an archived email",
-    subtitle: "Browse your archived messages",
-  },
-  spam: {
-    icon: AlertTriangle,
-    title: "Select an email",
-    subtitle: "Review your spam folder",
-  },
-  trash: {
-    icon: Trash2,
-    title: "Select a deleted email",
-    subtitle: "View messages in trash",
-  },
 }

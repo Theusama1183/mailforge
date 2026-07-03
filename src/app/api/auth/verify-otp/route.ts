@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import crypto from "crypto"
 
 function hashOTP(otp: string): string {
@@ -15,6 +16,12 @@ export async function POST(req: Request) {
 
     if (otp.length !== 4 || !/^\d{4}$/.test(otp)) {
       return NextResponse.json({ error: "Invalid OTP format" }, { status: 400 })
+    }
+
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
+    const rl = checkRateLimit(`verify-otp:${email}:${ip}`, RATE_LIMITS.auth)
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Too many attempts. Please wait." }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } })
     }
 
     const admin = createAdminClient()

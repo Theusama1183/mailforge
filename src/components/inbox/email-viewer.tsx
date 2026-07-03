@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { EmailToolbar } from "./email-toolbar"
 import { EmailHeader } from "./email-header"
 import { EmailBodyRenderer } from "./email-body-renderer"
+import { stripInvisibleChars } from "@/lib/email-utils"
 import type { Email } from "@/types"
 
 // Lazy-loaded DOMPurify to avoid blocking initial render
@@ -13,22 +14,28 @@ function sanitizeHtml(html: string): string {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const DOMPurify = require("dompurify") as typeof import("dompurify").default
 
-  // If this is a full HTML document, extract just the body content
+  // If this is a full HTML document, preserve <style> from <head>, then extract body content
   let cleanHtml = html
   if (/^\s*<(?:!DOCTYPE|html)/i.test(html)) {
+    const styleTags: string[] = []
+    const styleRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi
+    let m
+    while ((m = styleRegex.exec(html)) !== null) {
+      styleTags.push(`<style>${m[1]}</style>`)
+    }
+
     const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
     if (bodyMatch) {
-      cleanHtml = bodyMatch[1]
+      cleanHtml = styleTags.join("\n") + "\n" + bodyMatch[1]
     } else {
-      // Strip outer html/head/body tags
-      cleanHtml = html
+      cleanHtml = styleTags.join("\n") + "\n" + html
         .replace(/^[\s\S]*?<body[^>]*>/i, "")
         .replace(/<\/body>[\s\S]*$/i, "")
         .replace(/<\/html>\s*$/i, "")
     }
   }
 
-  return DOMPurify.sanitize(cleanHtml, {
+  return DOMPurify.sanitize(stripInvisibleChars(cleanHtml), {
     ADD_TAGS: ["style"],
     ALLOW_DATA_ATTR: false,
     ADD_ATTR: ["target", "style", "align", "valign", "bgcolor", "cellpadding", "cellspacing", "border"],
@@ -142,6 +149,11 @@ export function EmailViewer({
       <style jsx global>{`
         .email-body-html {
           line-height: 1.6;
+          font-size: 0.9375rem;
+          color: #1f2937;
+        }
+        .dark .email-body-html {
+          color: #e5e7eb;
         }
         .email-body-html p {
           margin-bottom: 0.75em;
@@ -177,6 +189,31 @@ export function EmailViewer({
         .email-body-html td {
           padding: 0.5rem;
           text-align: left;
+        }
+        .email-body-html h1,
+        .email-body-html h2,
+        .email-body-html h3,
+        .email-body-html h4 {
+          margin-top: 1.25em;
+          margin-bottom: 0.5em;
+          font-weight: 600;
+          line-height: 1.3;
+        }
+        .email-body-html ul,
+        .email-body-html ol {
+          padding-left: 1.5em;
+          margin-bottom: 0.75em;
+        }
+        .email-body-html li {
+          margin-bottom: 0.25em;
+        }
+        .email-body-html hr {
+          border: none;
+          border-top: 1px solid #e5e7eb;
+          margin: 1.5em 0;
+        }
+        .dark .email-body-html hr {
+          border-top-color: #374151;
         }
       `}</style>
     </div>

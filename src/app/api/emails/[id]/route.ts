@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/supabase/api-client"
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 
-const ALLOWED_FIELDS = ["subject", "body_html", "body_text", "starred", "read", "archived", "folder", "mailbox"] as const
+const ALLOWED_FIELDS = ["starred", "read", "folder"] as const
 type AllowedField = typeof ALLOWED_FIELDS[number]
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -12,10 +13,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { user, supabase  } = auth
+    const { user, supabase } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    // Field whitelisting: only allow specific fields to be updated
+    const rl = checkRateLimit(`patch:${user.id}`, RATE_LIMITS.emails)
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } })
+    }
+
     const sanitizedBody: Partial<Record<AllowedField, unknown>> = {}
     for (const key of Object.keys(body)) {
       if (ALLOWED_FIELDS.includes(key as AllowedField)) {
@@ -47,8 +52,13 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
     if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { user, supabase  } = auth
+    const { user, supabase } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const rl = checkRateLimit(`delete:${user.id}`, RATE_LIMITS.emails)
+    if (!rl.allowed) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } })
+    }
 
     const { error } = await supabase
       .from("emails")

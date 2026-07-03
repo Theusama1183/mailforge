@@ -34,60 +34,62 @@ export function EmailToolbar({
   return (
     <div
       className={cn(
-        "flex items-center gap-1 px-4 py-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex-shrink-0",
+        "flex items-center gap-1 px-4 py-1.5 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex-shrink-0 sticky top-0 z-10",
         className
       )}
       role="toolbar"
       aria-label="Email actions"
     >
-      {/* Back button (mobile) */}
+      {/* Back button */}
       <Button
         variant="ghost"
         size="icon"
         onClick={onBack}
-        className="md:hidden h-8 w-8"
+        className="h-8 w-8 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
         aria-label="Back to email list"
       >
         <ArrowLeft className="h-4 w-4" />
       </Button>
 
-      <div className="flex items-center gap-1 ml-auto sm:ml-0">
-        {/* Action buttons with text labels */}
+      <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1.5" aria-hidden="true" />
+
+      {/* Action buttons */}
+      <div className="flex items-center gap-0.5">
         <Button
           variant="ghost"
           size="sm"
           onClick={onReply}
-          className="h-8 gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="h-8 gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 px-2.5"
           aria-label="Reply to sender"
         >
           <Reply className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline text-xs">Reply</span>
+          <span className="hidden sm:inline text-xs font-medium">Reply</span>
         </Button>
 
         <Button
           variant="ghost"
           size="sm"
           onClick={onReplyAll}
-          className="h-8 gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="h-8 gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 px-2.5"
           aria-label="Reply to all"
         >
           <ReplyAll className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline text-xs">Reply All</span>
+          <span className="hidden sm:inline text-xs font-medium">Reply all</span>
         </Button>
 
         <Button
           variant="ghost"
           size="sm"
           onClick={onForward}
-          className="h-8 gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="h-8 gap-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 px-2.5"
           aria-label="Forward email"
         >
           <Forward className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline text-xs">Forward</span>
+          <span className="hidden sm:inline text-xs font-medium">Forward</span>
         </Button>
+      </div>
 
-        <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" aria-hidden="true" />
-
+      <div className="ml-auto flex items-center gap-0.5">
         <Button
           variant="ghost"
           size="icon"
