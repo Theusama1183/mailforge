@@ -24,8 +24,19 @@ export default function LoginPage() {
     try {
       if (mode === "register") {
         if (!agreedToTerms) { setError("Please accept the Terms of Service and Privacy Policy"); setLoading(false); return }
-        const { error } = await supabase.auth.signUp({ email, password })
-        if (error) throw error
+        // Use our own signup API (bypasses Supabase's built-in confirmation email)
+        const signupRes = await fetch("/api/auth/signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        })
+        if (!signupRes.ok) {
+          const err = await signupRes.json()
+          throw new Error(err.error || "Failed to create account")
+        }
+        // Sign in to create a session (user was created with email_confirm:true)
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+        if (signInError) throw signInError
         // Send OTP for email verification
         const otpRes = await fetch("/api/auth/send-otp", {
           method: "POST",
@@ -35,6 +46,7 @@ export default function LoginPage() {
         if (otpRes.ok) {
           router.push(`/otp?email=${encodeURIComponent(email)}`)
         } else {
+          // OTP send failed (likely SMTP not configured) — let user in without verification
           router.push("/onboarding")
         }
       } else {
