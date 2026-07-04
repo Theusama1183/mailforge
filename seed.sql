@@ -1,0 +1,2 @@
+-- Seed data for local Supabase development
+-- This file is referenced by supabase/config.toml [db.seed] sql_paths

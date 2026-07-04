@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { getAuthUser } from "@/lib/supabase/api-client"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 async function upsertCloudflareRule(zoneId: string, token: string, localPart: string, domainName: string) {
@@ -67,8 +68,11 @@ async function upsertCloudflareRule(zoneId: string, token: string, localPart: st
 
 export async function POST(req: Request) {
   try {
-    const { domains, emails, userId, cfToken } = await req.json()
-    if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+    const auth = await getAuthUser(req)
+    if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const userId = auth.user.id
+    const { domains, emails, cfToken } = await req.json()
 
     const supabase = createAdminClient()
     const results: { domain: string; status: string; error?: string; routes?: number }[] = []

@@ -7,13 +7,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params
     const auth = await getAuthUser(req)
 
-    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { user  } = auth
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-    // Use admin client to fetch members with their email from public.users
+    const { user } = auth
     const admin = createAdminClient()
+
+    const { data: membership } = await admin
+      .from("workspace_members")
+      .select("id")
+      .eq("workspace_id", id)
+      .eq("user_id", user.id)
+      .maybeSingle()
+
+    if (!membership) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
     const { data, error } = await admin
       .from("workspace_members")
       .select("id, user_id, role, created_at, users!inner(email)")
@@ -31,16 +38,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { id } = await params
     const auth = await getAuthUser(req)
 
-    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { user  } = auth
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { user } = auth
+    const admin = createAdminClient()
+
+    const { data: membership } = await admin
+      .from("workspace_members")
+      .select("role")
+      .eq("workspace_id", id)
+      .eq("user_id", user.id)
+      .maybeSingle()
+
+    if (!membership || membership.role !== "admin") {
+      return NextResponse.json({ error: "Only admins can add members" }, { status: 403 })
+    }
 
     const { email, role } = await req.json()
     if (!email) return NextResponse.json({ error: "Email is required" }, { status: 400 })
 
-    // Look up user by email in public.users (populated by auth trigger)
-    const admin = createAdminClient()
     const { data: invitedUser, error: lookupError } = await admin
       .from("users")
       .select("id")
@@ -56,7 +72,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: "User not found. They need to register first." }, { status: 404 })
     }
 
-    // Check if already a member
     const { data: existingMember } = await admin
       .from("workspace_members")
       .select("id")
@@ -95,15 +110,22 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
     const auth = await getAuthUser(req)
 
+    if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-
-    const { user  } = auth
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-    // Use admin client to bypass RLS
+    const { user } = auth
     const admin = createAdminClient()
+
+    const { data: membership } = await admin
+      .from("workspace_members")
+      .select("role")
+      .eq("workspace_id", id)
+      .eq("user_id", user.id)
+      .maybeSingle()
+
+    if (!membership || membership.role !== "admin") {
+      return NextResponse.json({ error: "Only admins can remove members" }, { status: 403 })
+    }
+
     const { error } = await admin.from("workspace_members").delete().eq("id", memberId).eq("workspace_id", id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ success: true })

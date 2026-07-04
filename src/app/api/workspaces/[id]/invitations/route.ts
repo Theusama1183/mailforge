@@ -9,12 +9,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params
     const auth = await getAuthUser(req)
 
-    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { user  } = auth
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
+    const { user } = auth
     const admin = createAdminClient()
+
+    const { data: membership } = await admin
+      .from("workspace_members")
+      .select("id")
+      .eq("workspace_id", id)
+      .eq("user_id", user.id)
+      .maybeSingle()
+
+    if (!membership) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
     const { data, error } = await admin
       .from("invitations")
       .select("*, users!inner(email) as inviter")
@@ -152,14 +160,22 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
     const auth = await getAuthUser(req)
 
+    if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-
-    const { user  } = auth
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
+    const { user } = auth
     const admin = createAdminClient()
+
+    const { data: membership } = await admin
+      .from("workspace_members")
+      .select("role")
+      .eq("workspace_id", id)
+      .eq("user_id", user.id)
+      .maybeSingle()
+
+    if (!membership || membership.role !== "admin") {
+      return NextResponse.json({ error: "Only admins can cancel invitations" }, { status: 403 })
+    }
+
     const { error } = await admin
       .from("invitations")
       .update({ status: "cancelled" })

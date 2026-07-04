@@ -54,30 +54,40 @@ export async function POST(req: Request) {
     const supabase = createAdminClient()
     const fromAddress = typeof from === "string" ? from : from.address
     const fromName = typeof from === "string" ? null : from.name || null
+    const toLocalPart = to.split("@")[0]
+    const toDomain = to.split("@")[1]
 
-    // Check if this email address belongs to a workspace
-    const { data: emailAddr } = await supabase
+    // Look up the domain to get domain_id for proper email_addresses filtering
+    let domainId: string | null = null
+    if (toDomain) {
+      const { data: domainRecord } = await supabase
+        .from("domains")
+        .select("id")
+        .eq("domain", toDomain)
+        .maybeSingle()
+      if (domainRecord) {
+        domainId = domainRecord.id
+      }
+    }
+
+    // Find the email address by local_part AND domain_id
+    let emailAddrQuery = supabase
       .from("email_addresses")
-      .select("workspace_id, local_part")
-      .eq("local_part", to.split("@")[0])
-      .maybeSingle()
+      .select("workspace_id, assigned_to, local_part")
+      .eq("local_part", toLocalPart)
+
+    if (domainId) {
+      emailAddrQuery = emailAddrQuery.eq("domain_id", domainId)
+    }
+
+    const { data: emailAddr } = await emailAddrQuery.maybeSingle()
 
     let userIds = [userId]
 
-    if (emailAddr?.workspace_id) {
-      // Check if email is assigned to a specific user
-      const { data: assignedEmail } = await supabase
-        .from("email_addresses")
-        .select("assigned_to")
-        .eq("local_part", to.split("@")[0])
-        .not("assigned_to", "is", null)
-        .maybeSingle()
-
-      if (assignedEmail?.assigned_to) {
-        // Only insert for the assigned user
-        userIds = [assignedEmail.assigned_to]
-      } else {
-        // Not assigned to anyone — insert for all workspace members
+    if (emailAddr?.workspace_id || emailAddr?.assigned_to) {
+      if (emailAddr?.assigned_to) {
+        userIds = [emailAddr.assigned_to]
+      } else if (emailAddr?.workspace_id) {
         const { data: members } = await supabase
           .from("workspace_members")
           .select("user_id")
