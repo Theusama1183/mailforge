@@ -8,10 +8,12 @@ type Props = {
   setData: (data: any) => void
 }
 
+const ALLOWED_KEYS = ['backgroundColor', 'borderColor', 'borderRadius', 'padding']
+
 export default function ContainerSidebarPanel({ data, setData }: Props) {
   return (
     <BaseSidebarPanel title="Container">
-      <SingleStylePropertyPanel style={data.style ?? {}} onChange={(style) => setData({ ...data, style })} />
+      <SingleStylePropertyPanel allowedKeys={ALLOWED_KEYS} style={data.style ?? {}} onChange={(style) => setData({ ...data, style })} />
     </BaseSidebarPanel>
   )
 }

@@ -4,7 +4,6 @@ import { z } from 'zod'
 import { AvatarPropsSchema } from '@usewaypoint/block-avatar'
 
 import BaseSidebarPanel from './helpers/BaseSidebarPanel'
-import ColorInput from './helpers/inputs/ColorInput'
 import RadioGroupInput from './helpers/inputs/RadioGroupInput'
 import TextDimensionInput from './helpers/inputs/TextDimensionInput'
 import TextInput from './helpers/inputs/TextInput'
@@ -15,10 +14,13 @@ type Props = {
   setData: (data: z.infer<typeof AvatarPropsSchema>) => void
 }
 
+const ALLOWED_KEYS = ['textAlign', 'padding']
+
 export default function AvatarSidebarPanel({ data, setData }: Props) {
   return (
     <BaseSidebarPanel title="Avatar">
       <TextInput label="Image URL" value={data.props?.imageUrl} onChange={(imageUrl) => setData({ ...data, props: { ...data.props, imageUrl } })} />
+      <TextInput label="Alt text" value={data.props?.alt} onChange={(alt) => setData({ ...data, props: { ...data.props, alt } })} />
       <TextDimensionInput label="Size" value={data.props?.size} onChange={(size) => setData({ ...data, props: { ...data.props, size } })} />
       <RadioGroupInput
         label="Shape"
@@ -30,7 +32,7 @@ export default function AvatarSidebarPanel({ data, setData }: Props) {
         ]}
         onChange={(shape) => setData({ ...data, props: { ...data.props, shape } as any })}
       />
-      <SingleStylePropertyPanel style={data.style ?? {}} onChange={(style) => setData({ ...data, style })} />
+      <SingleStylePropertyPanel allowedKeys={ALLOWED_KEYS} style={data.style ?? {}} onChange={(style) => setData({ ...data, style })} />
     </BaseSidebarPanel>
   )
 }

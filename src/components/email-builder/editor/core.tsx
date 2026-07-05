@@ -4,7 +4,8 @@ import { z } from 'zod'
 import { Avatar, AvatarPropsSchema } from '@usewaypoint/block-avatar'
 import { Button, ButtonPropsSchema } from '@usewaypoint/block-button'
 import { Divider, DividerPropsSchema } from '@usewaypoint/block-divider'
-import { Heading, HeadingPropsSchema } from '@usewaypoint/block-heading'
+import HeadingBlockEditor from '../blocks/Heading/HeadingBlockEditor'
+import HeadingBlockPropsSchema from '../blocks/Heading/HeadingBlockPropsSchema'
 import { Html, HtmlPropsSchema } from '@usewaypoint/block-html'
 import { Image, ImagePropsSchema } from '@usewaypoint/block-image'
 import { Spacer, SpacerPropsSchema } from '@usewaypoint/block-spacer'
@@ -57,10 +58,10 @@ const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
     ),
   },
   Heading: {
-    schema: HeadingPropsSchema,
+    schema: HeadingBlockPropsSchema,
     Component: (props) => (
       <EditorBlockWrapper>
-        <Heading {...props} />
+        <HeadingBlockEditor {...props} />
       </EditorBlockWrapper>
     ),
   },

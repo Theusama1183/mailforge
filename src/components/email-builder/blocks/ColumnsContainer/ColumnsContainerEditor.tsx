@@ -12,11 +12,15 @@ const EMPTY_COLUMNS = [{ childrenIds: [] }, { childrenIds: [] }, { childrenIds: 
 
 export default function ColumnsContainerEditor({ style, props }: ColumnsContainerProps) {
   const currentBlockId = useCurrentBlockId()
+  const columnsCount = props?.columnsCount ?? 2
+  const columnsArray = columnsCount === 2
+    ? [{ childrenIds: [] }, { childrenIds: [] }]
+    : [{ childrenIds: [] }, { childrenIds: [] }, { childrenIds: [] }]
 
-  const columnsValue: Array<{ childrenIds: string[] }> = (props?.columns ?? EMPTY_COLUMNS) as Array<{ childrenIds: string[] }>
+  const columnsValue: Array<{ childrenIds: string[] }> = (props?.columns ?? columnsArray) as Array<{ childrenIds: string[] }>
   const restProps = props ?? {}
 
-  const updateColumn = (columnIndex: 0 | 1 | 2, { block, blockId, childrenIds }: EditorChildrenChange) => {
+  const updateColumn = (columnIndex: number, { block, blockId, childrenIds }: EditorChildrenChange) => {
     const nColumns = [...columnsValue]
     nColumns[columnIndex] = { childrenIds }
     setDocument({
@@ -35,15 +39,22 @@ export default function ColumnsContainerEditor({ style, props }: ColumnsContaine
     setSelectedBlockId(blockId)
   }
 
+  const colEditors = columnsCount === 2
+    ? [
+        <EditorChildrenIds key={0} childrenIds={columnsValue[0]?.childrenIds} onChange={(change) => updateColumn(0, change)} />,
+        <EditorChildrenIds key={1} childrenIds={columnsValue[1]?.childrenIds} onChange={(change) => updateColumn(1, change)} />,
+      ]
+    : [
+        <EditorChildrenIds key={0} childrenIds={columnsValue[0]?.childrenIds} onChange={(change) => updateColumn(0, change)} />,
+        <EditorChildrenIds key={1} childrenIds={columnsValue[1]?.childrenIds} onChange={(change) => updateColumn(1, change)} />,
+        <EditorChildrenIds key={2} childrenIds={columnsValue[2]?.childrenIds} onChange={(change) => updateColumn(2, change)} />,
+      ]
+
   return (
     <BaseColumnsContainer
       props={restProps}
       style={style}
-      columns={[
-        <EditorChildrenIds childrenIds={columnsValue[0]?.childrenIds} onChange={(change) => updateColumn(0, change)} />,
-        <EditorChildrenIds childrenIds={columnsValue[1]?.childrenIds} onChange={(change) => updateColumn(1, change)} />,
-        <EditorChildrenIds childrenIds={columnsValue[2]?.childrenIds} onChange={(change) => updateColumn(2, change)} />,
-      ]}
+      columns={colEditors}
     />
   )
 }

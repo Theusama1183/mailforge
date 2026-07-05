@@ -10,12 +10,14 @@ type Props = {
   setData: (data: any) => void
 }
 
+const ALLOWED_KEYS = ['backgroundColor', 'padding']
+
 export default function DividerSidebarPanel({ data, setData }: Props) {
   return (
     <BaseSidebarPanel title="Divider">
       <ColorInput label="Line color" value={data.props?.lineColor} onChange={(lineColor) => setData({ ...data, props: { ...data.props, lineColor } })} />
-      <SliderInput label="Line width" value={data.props?.lineWeight} onChange={(lineWeight) => setData({ ...data, props: { ...data.props, lineWeight } })} min={1} max={10} />
-      <SingleStylePropertyPanel style={data.style ?? {}} onChange={(style) => setData({ ...data, style })} />
+      <SliderInput label="Line height" value={data.props?.lineHeight} onChange={(lineHeight) => setData({ ...data, props: { ...data.props, lineHeight } })} min={1} max={10} />
+      <SingleStylePropertyPanel allowedKeys={ALLOWED_KEYS} style={data.style ?? {}} onChange={(style) => setData({ ...data, style })} />
     </BaseSidebarPanel>
   )
 }

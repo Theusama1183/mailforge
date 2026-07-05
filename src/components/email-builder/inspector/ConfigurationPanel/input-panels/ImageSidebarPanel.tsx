@@ -11,6 +11,8 @@ type Props = {
   setData: (data: any) => void
 }
 
+const ALLOWED_KEYS = ['backgroundColor', 'textAlign', 'padding']
+
 export default function ImageSidebarPanel({ data, setData }: Props) {
   return (
     <BaseSidebarPanel title="Image">
@@ -18,6 +20,7 @@ export default function ImageSidebarPanel({ data, setData }: Props) {
       <TextInput label="Alt text" value={data.props?.alt} onChange={(alt) => setData({ ...data, props: { ...data.props, alt } })} />
       <TextInput label="Link URL" value={data.props?.linkHref} onChange={(linkHref) => setData({ ...data, props: { ...data.props, linkHref } })} />
       <TextDimensionInput label="Width" value={data.props?.width} onChange={(width) => setData({ ...data, props: { ...data.props, width } })} />
+      <TextDimensionInput label="Height" value={data.props?.height} onChange={(height) => setData({ ...data, props: { ...data.props, height } })} />
       <RadioGroupInput
         label="Content alignment"
         value={data.props?.contentAlignment ?? 'middle'}
@@ -28,7 +31,7 @@ export default function ImageSidebarPanel({ data, setData }: Props) {
         ]}
         onChange={(contentAlignment) => setData({ ...data, props: { ...data.props, contentAlignment } })}
       />
-      <SingleStylePropertyPanel style={data.style ?? {}} onChange={(style) => setData({ ...data, style })} />
+      <SingleStylePropertyPanel allowedKeys={ALLOWED_KEYS} style={data.style ?? {}} onChange={(style) => setData({ ...data, style })} />
     </BaseSidebarPanel>
   )
 }

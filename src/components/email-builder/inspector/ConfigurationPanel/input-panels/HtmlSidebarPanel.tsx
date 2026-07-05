@@ -9,11 +9,13 @@ type Props = {
   setData: (data: any) => void
 }
 
+const ALLOWED_KEYS = ['backgroundColor', 'color', 'fontFamily', 'fontSize', 'textAlign', 'padding']
+
 export default function HtmlSidebarPanel({ data, setData }: Props) {
   return (
     <BaseSidebarPanel title="HTML">
       <TextInput label="HTML contents" value={data.props?.contents} onChange={(contents) => setData({ ...data, props: { ...data.props, contents } })} multiline rows={8} />
-      <SingleStylePropertyPanel style={data.style ?? {}} onChange={(style) => setData({ ...data, style })} />
+      <SingleStylePropertyPanel allowedKeys={ALLOWED_KEYS} style={data.style ?? {}} onChange={(style) => setData({ ...data, style })} />
     </BaseSidebarPanel>
   )
 }
