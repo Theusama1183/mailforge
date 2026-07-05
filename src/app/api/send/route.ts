@@ -26,17 +26,79 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Too many requests. Please wait before sending more emails." }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } })
     }
 
-    const { data: domains } = await supabase
-      .from("domains")
-      .select("*")
-      .eq("user_id", userId)
+    let domain
 
-    if (!domains?.length) {
+    if (fromAddress) {
+      const { data: emailAddr } = await supabase
+        .from("email_addresses")
+        .select("domain_id, local_part, workspace_id, assigned_to")
+        .eq("local_part", fromAddress.split("@")[0])
+        .maybeSingle()
+
+      if (emailAddr) {
+        const isAssigned = emailAddr.assigned_to === userId
+        const { data: member } = emailAddr.workspace_id ? await supabase
+          .from("workspace_members")
+          .select("id")
+          .eq("workspace_id", emailAddr.workspace_id)
+          .eq("user_id", userId)
+          .maybeSingle() : { data: null }
+
+        if (isAssigned || member) {
+          const { data: domainRecord } = await supabase
+            .from("domains")
+            .select("*")
+            .eq("id", emailAddr.domain_id)
+            .single()
+          domain = domainRecord
+        }
+      }
+    }
+
+    if (!domain) {
+      const { data: ownDomains } = await supabase
+        .from("domains")
+        .select("*")
+        .eq("user_id", userId)
+
+      if (ownDomains?.length) {
+        domain = ownDomains[0]
+      }
+    }
+
+    if (!domain) {
+      const { data: wsMemberships } = await supabase
+        .from("workspace_members")
+        .select("workspace_id")
+        .eq("user_id", userId)
+
+      if (wsMemberships?.length) {
+        const wsIds = wsMemberships.map(m => m.workspace_id)
+        const { data: wsDomains } = await supabase
+          .from("email_addresses")
+          .select("domain_id")
+          .in("workspace_id", wsIds)
+
+        if (wsDomains?.length) {
+          const domainIds = [...new Set(wsDomains.map(d => d.domain_id))]
+          const { data: domainRecords } = await supabase
+            .from("domains")
+            .select("*")
+            .in("id", domainIds)
+            .limit(1)
+
+          if (domainRecords?.length) {
+            domain = domainRecords[0]
+          }
+        }
+      }
+    }
+
+    if (!domain) {
       return NextResponse.json({ error: "No domain configured" }, { status: 400 })
     }
 
-    const domain = domains[0]
-    const from = fromAddress || `you@${domain.domain}`
+    const sendFrom = fromAddress || `you@${domain.domain}`
 
     if (!domain.smtp_provider) {
       return NextResponse.json({ error: "SMTP not configured for this domain. Go to Settings." }, { status: 400 })
@@ -64,7 +126,7 @@ export async function POST(req: Request) {
         mailgunApiKey: domain.mailgun_api_key,
         mailgunDomain: domain.mailgun_domain,
       },
-      from,
+      from: sendFrom,
       to,
       cc,
       bcc,
@@ -77,8 +139,8 @@ export async function POST(req: Request) {
     const { error: dbError } = await supabase.from("emails").insert({
       id: emailId,
       user_id: userId,
-      mailbox_address: from,
-      from_address: from,
+      mailbox_address: sendFrom,
+      from_address: sendFrom,
       to_addresses: to,
       cc_addresses: cc || null,
       subject,

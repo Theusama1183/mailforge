@@ -3,6 +3,7 @@
 -- 1. Fix invitations "Anyone can view by token" policy
 -- 2. Fix auth_otps RLS policy
 -- 3. Add workspaces update/delete policy for admins
+-- 4. Allow workspace members to view domains linked to their assigned emails
 -- ==============================================================
 
 -- 1. Fix invitations: Replace overly permissive SELECT policy
@@ -46,5 +47,19 @@ CREATE POLICY "Admins can delete workspace"
     created_by = auth.uid()
     OR public.is_workspace_admin(id)
   );
+
+-- 4. Allow workspace members to view domains linked to their assigned emails
+-- Members need SELECT on domains to send emails via the domain's SMTP config
+DROP POLICY IF EXISTS "Members can view assigned domains" ON public.domains;
+CREATE POLICY "Members can view assigned domains" ON public.domains
+  FOR SELECT USING (
+    id IN (
+      SELECT domain_id FROM public.email_addresses
+      WHERE assigned_to = auth.uid()
+    )
+  );
+
+-- Also allow domain owners to still manage their own domains (existing policy)
+-- Keep existing "Workspace admins can view domains" policy for admins
 
 NOTIFY pgrst, 'reload schema';
