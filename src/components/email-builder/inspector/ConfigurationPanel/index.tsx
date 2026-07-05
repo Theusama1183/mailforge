@@ -6,6 +6,7 @@ import { TEditorBlock } from '../../editor/core'
 import { setDocument, useDocument, useSelectedBlockId } from '../../editor/EditorContext'
 
 import AvatarSidebarPanel from './input-panels/AvatarSidebarPanel'
+import ButtonGroupSidebarPanel from './input-panels/ButtonGroupSidebarPanel'
 import ButtonSidebarPanel from './input-panels/ButtonSidebarPanel'
 import ColumnsContainerSidebarPanel from './input-panels/ColumnsContainerSidebarPanel'
 import ContainerSidebarPanel from './input-panels/ContainerSidebarPanel'
@@ -14,6 +15,7 @@ import EmailLayoutSidebarPanel from './input-panels/EmailLayoutSidebarPanel'
 import HeadingSidebarPanel from './input-panels/HeadingSidebarPanel'
 import HtmlSidebarPanel from './input-panels/HtmlSidebarPanel'
 import ImageSidebarPanel from './input-panels/ImageSidebarPanel'
+import SocialLinksSidebarPanel from './input-panels/SocialLinksSidebarPanel'
 import SpacerSidebarPanel from './input-panels/SpacerSidebarPanel'
 import TextSidebarPanel from './input-panels/TextSidebarPanel'
 
@@ -44,6 +46,8 @@ export default function ConfigurationPanel() {
       return <AvatarSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
     case 'Button':
       return <ButtonSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
+    case 'ButtonGroup':
+      return <ButtonGroupSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
     case 'ColumnsContainer':
       return (
         <ColumnsContainerSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
@@ -58,6 +62,8 @@ export default function ConfigurationPanel() {
       return <HtmlSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
     case 'Image':
       return <ImageSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
+    case 'SocialLinks':
+      return <SocialLinksSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
     case 'EmailLayout':
       return <EmailLayoutSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
     case 'Spacer':

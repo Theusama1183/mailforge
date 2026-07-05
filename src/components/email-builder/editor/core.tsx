@@ -16,6 +16,8 @@ import {
   buildBlockConfigurationSchema,
 } from '@usewaypoint/document-core'
 
+import ButtonGroupEditor from '../blocks/ButtonGroup/ButtonGroupEditor'
+import ButtonGroupPropsSchema from '../blocks/ButtonGroup/ButtonGroupPropsSchema'
 import ColumnsContainerEditor from '../blocks/ColumnsContainer/ColumnsContainerEditor'
 import ColumnsContainerPropsSchema from '../blocks/ColumnsContainer/ColumnsContainerPropsSchema'
 import ContainerEditor from '../blocks/Container/ContainerEditor'
@@ -23,6 +25,8 @@ import ContainerPropsSchema from '../blocks/Container/ContainerPropsSchema'
 import EmailLayoutEditor from '../blocks/EmailLayout/EmailLayoutEditor'
 import EmailLayoutPropsSchema from '../blocks/EmailLayout/EmailLayoutPropsSchema'
 import EditorBlockWrapper from '../blocks/helpers/block-wrappers/EditorBlockWrapper'
+import SocialLinksEditor from '../blocks/SocialLinks/SocialLinksEditor'
+import SocialLinksPropsSchema from '../blocks/SocialLinks/SocialLinksPropsSchema'
 
 const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
   Avatar: {
@@ -38,6 +42,14 @@ const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
     Component: (props) => (
       <EditorBlockWrapper>
         <Button {...props} />
+      </EditorBlockWrapper>
+    ),
+  },
+  ButtonGroup: {
+    schema: ButtonGroupPropsSchema,
+    Component: (props) => (
+      <EditorBlockWrapper>
+        <ButtonGroupEditor {...props} />
       </EditorBlockWrapper>
     ),
   },
@@ -89,6 +101,14 @@ const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
         </EditorBlockWrapper>
       )
     },
+  },
+  SocialLinks: {
+    schema: SocialLinksPropsSchema,
+    Component: (props) => (
+      <EditorBlockWrapper>
+        <SocialLinksEditor {...props} />
+      </EditorBlockWrapper>
+    ),
   },
   Text: {
     schema: TextPropsSchema,

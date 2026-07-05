@@ -1,8 +1,10 @@
 import React from 'react'
 
-import { Box, Divider, Stack, Typography } from '@mui/material'
+import { Box, Divider, Stack, Typography, Button } from '@mui/material'
 
-import { useSamplesDrawerOpen } from '../editor/EditorContext'
+import { useSamplesDrawerOpen, resetDocument } from '../editor/EditorContext'
+import { TEMPLATES, buildTemplate } from '../templates'
+import getConfiguration from '../editor/getConfiguration'
 
 import SidebarButton from './SidebarButton'
 
@@ -34,6 +36,33 @@ export default function SamplesDrawer() {
             <Stack sx={{ alignItems: 'flex-start' }}>
               <SidebarButton href="#">Empty</SidebarButton>
             </Stack>
+
+            <Divider />
+
+            <Typography variant="overline" color="text.secondary" sx={{ px: 0.75 }}>
+              Templates
+            </Typography>
+
+            {TEMPLATES.map((tmpl) => (
+              <Button
+                key={tmpl.name}
+                size="small"
+                onClick={() => {
+                  const config = buildTemplate(tmpl.name)
+                  if (config) resetDocument(config)
+                }}
+                sx={{ textTransform: 'none', justifyContent: 'flex-start', px: 1 }}
+              >
+                <Stack sx={{ textAlign: 'left' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {tmpl.label}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {tmpl.description}
+                  </Typography>
+                </Stack>
+              </Button>
+            ))}
 
             <Divider />
 

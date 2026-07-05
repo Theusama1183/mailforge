@@ -9,6 +9,7 @@ import {
   ImageOutlined,
   LibraryAddOutlined,
   NotesOutlined,
+  ShareOutlined,
   SmartButtonOutlined,
   ViewColumnOutlined,
 } from '@mui/icons-material'
@@ -151,6 +152,56 @@ export const BUTTONS: TButtonProps[] = [
       type: 'Container',
       data: {
         style: { padding: { top: 16, bottom: 16, left: 24, right: 24 } },
+      },
+    }),
+  },
+  {
+    label: 'Social Links',
+    icon: <ShareOutlined />,
+    block: () => ({
+      type: 'SocialLinks',
+      data: {
+        props: {
+          links: [
+            { platform: 'facebook', url: 'https://facebook.com', enabled: true },
+            { platform: 'twitter', url: 'https://twitter.com', enabled: true },
+            { platform: 'instagram', url: 'https://instagram.com', enabled: true },
+            { platform: 'linkedin', url: 'https://linkedin.com', enabled: true },
+          ],
+          alignment: 'horizontal',
+        },
+        style: {
+          padding: { top: 16, bottom: 16, left: 24, right: 24 },
+          iconSize: 24,
+          iconColor: '#000000',
+          iconGap: 12,
+          textAlign: 'center',
+        },
+      },
+    }),
+  },
+  {
+    label: 'Button Group',
+    icon: <SmartButtonOutlined />,
+    block: () => ({
+      type: 'ButtonGroup',
+      data: {
+        props: {
+          buttons: [
+            { text: 'Get Started', url: 'https://example.com' },
+            { text: 'Learn More', url: 'https://example.com' },
+          ],
+          alignment: 'horizontal',
+        },
+        style: {
+          padding: { top: 16, bottom: 16, left: 24, right: 24 },
+          gap: 12,
+          buttonBackgroundColor: '#3B82F6',
+          buttonTextColor: '#FFFFFF',
+          buttonBorderRadius: 6,
+          buttonFontSize: 14,
+          textAlign: 'center',
+        },
       },
     }),
   },
