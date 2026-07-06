@@ -175,6 +175,28 @@ export default function ContainerSidebarPanel({ data, setData }: Props) {
           onChange={(mobileFlexDirection) => setData({ ...data, style: { ...style, mobileFlexDirection } })}
         />
         <SliderInput label="Mobile gap" value={style.mobileGap} onChange={(mobileGap) => setData({ ...data, style: { ...style, mobileGap } })} min={0} max={80} />
+
+        <Divider />
+
+        <Box sx={{ typography: 'overline', color: 'text.secondary' }}>Advanced</Box>
+        <SliderInput
+          label="Minimum height (px)"
+          value={style.minHeight}
+          onChange={(minHeight) => setData({ ...data, style: { ...style, minHeight } })}
+          min={0}
+          max={1000}
+        />
+        <RadioGroupInput
+          label="Overflow"
+          value={style.overflow ?? 'visible'}
+          options={[
+            { value: 'visible', label: 'Visible' },
+            { value: 'hidden', label: 'Hidden' },
+            { value: 'scroll', label: 'Scroll' },
+            { value: 'auto', label: 'Auto' },
+          ]}
+          onChange={(overflow) => setData({ ...data, style: { ...style, overflow } })}
+        />
       </Box>
     </BaseSidebarPanel>
   )

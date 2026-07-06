@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { SaveOutlined, ArrowBackOutlined } from '@mui/icons-material'
 import { Box, Button, CircularProgress, Stack, TextField, ThemeProvider, Typography, createTheme } from '@mui/material'
-import { renderToStaticMarkup } from '@usewaypoint/email-builder'
+import { renderToHtml } from '@/components/email-builder/render-to-html'
 import { createClient } from '@/lib/supabase/client'
 
 import InspectorDrawer from '@/components/email-builder/inspector'
@@ -81,7 +81,7 @@ export default function EmailBuilderPage() {
 
       const document = getDocumentSnapshot()
       const jsonConfig = JSON.stringify(document)
-      const html = renderToStaticMarkup(document, { rootBlockId: 'root' })
+      const html = renderToHtml(document, 'root')
 
       const payload = {
         name: templateName || 'Untitled Template',

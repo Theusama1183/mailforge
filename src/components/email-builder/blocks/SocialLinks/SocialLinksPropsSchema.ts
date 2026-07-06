@@ -21,6 +21,9 @@ const SocialLinksPropsSchema = z.object({
     iconBackgroundColor: z.string().optional().nullable(),
     iconBorderRadius: z.number().min(0).max(30).optional().nullable(),
     iconPadding: z.number().min(0).max(20).optional().nullable(),
+    iconBorderWidth: z.number().min(0).max(10).optional().nullable(),
+    iconBorderColor: z.string().optional().nullable(),
+    iconBorderStyle: z.enum(['solid', 'dashed', 'dotted']).optional().nullable(),
   }).optional().nullable(),
   props: z.object({
     links: z.array(SocialLinkItemSchema).optional().nullable(),

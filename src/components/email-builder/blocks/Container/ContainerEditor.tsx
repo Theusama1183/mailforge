@@ -39,6 +39,9 @@ export default function ContainerEditor({ style, props }: ContainerProps) {
     justifyContent: (style?.justifyContent as React.CSSProperties['justifyContent']) ?? undefined,
     gap: style?.gap ?? undefined,
     background: gradientBg ?? undefined,
+    boxShadow: style?.boxShadow ?? undefined,
+    minHeight: style?.minHeight != null ? `${style.minHeight}px` : undefined,
+    overflow: (style?.overflow as React.CSSProperties['overflow']) ?? undefined,
   }
 
   return (

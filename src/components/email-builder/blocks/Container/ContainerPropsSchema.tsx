@@ -31,6 +31,9 @@ const ContainerPropsSchema = z.object({
     mobileDisplay: z.enum(['block', 'flex', 'inline-flex']).optional().nullable(),
     mobileFlexDirection: z.enum(['row', 'column', 'row-reverse', 'column-reverse']).optional().nullable(),
     mobileGap: z.number().min(0).optional().nullable(),
+    boxShadow: z.string().optional().nullable(),
+    minHeight: z.number().min(0).optional().nullable(),
+    overflow: z.enum(['visible', 'hidden', 'scroll', 'auto']).optional().nullable(),
   }).optional().nullable(),
   props: z.object({
     childrenIds: z.array(z.string()).optional().nullable(),

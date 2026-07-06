@@ -23,6 +23,9 @@ export default function SocialLinksEditor({ style, props }: SocialLinksProps) {
   const iconBg = style?.iconBackgroundColor
   const iconRadius = style?.iconBorderRadius ?? 4
   const iconPadding = style?.iconPadding ?? 0
+  const iconBorderWidth = style?.iconBorderWidth ?? 0
+  const iconBorderColor = style?.iconBorderColor
+  const iconBorderStyle = style?.iconBorderStyle ?? 'solid'
 
   const containerStyle: React.CSSProperties = {
     textAlign: (style?.textAlign as React.CSSProperties['textAlign']) ?? 'center',
@@ -49,12 +52,13 @@ export default function SocialLinksEditor({ style, props }: SocialLinksProps) {
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: iconBg ? iconSize + iconPadding * 2 : undefined,
-            height: iconBg ? iconSize + iconPadding * 2 : undefined,
+            width: iconBg || iconBorderWidth ? iconSize + iconPadding * 2 : undefined,
+            height: iconBg || iconBorderWidth ? iconSize + iconPadding * 2 : undefined,
             backgroundColor: iconBg ?? undefined,
             borderRadius: iconRadius,
-            padding: iconBg ? iconPadding : 0,
+            padding: iconBg || iconBorderWidth ? iconPadding : 0,
             textDecoration: 'none',
+            border: iconBorderWidth && iconBorderColor ? `${iconBorderWidth}px ${iconBorderStyle} ${iconBorderColor}` : undefined,
           }
           return (
             <li key={i}>

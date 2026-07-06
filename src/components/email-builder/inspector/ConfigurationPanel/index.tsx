@@ -5,19 +5,23 @@ import { Box, Typography } from '@mui/material'
 import { TEditorBlock } from '../../editor/core'
 import { setDocument, useDocument, useSelectedBlockId } from '../../editor/EditorContext'
 
+import AccordionSidebarPanel from './input-panels/AccordionSidebarPanel'
 import AvatarSidebarPanel from './input-panels/AvatarSidebarPanel'
 import ButtonGroupSidebarPanel from './input-panels/ButtonGroupSidebarPanel'
 import ButtonSidebarPanel from './input-panels/ButtonSidebarPanel'
 import ColumnsContainerSidebarPanel from './input-panels/ColumnsContainerSidebarPanel'
 import ContainerSidebarPanel from './input-panels/ContainerSidebarPanel'
+import CountdownTimerSidebarPanel from './input-panels/CountdownTimerSidebarPanel'
 import DividerSidebarPanel from './input-panels/DividerSidebarPanel'
 import EmailLayoutSidebarPanel from './input-panels/EmailLayoutSidebarPanel'
 import HeadingSidebarPanel from './input-panels/HeadingSidebarPanel'
 import HtmlSidebarPanel from './input-panels/HtmlSidebarPanel'
 import ImageSidebarPanel from './input-panels/ImageSidebarPanel'
+import ProgressBarSidebarPanel from './input-panels/ProgressBarSidebarPanel'
 import SocialLinksSidebarPanel from './input-panels/SocialLinksSidebarPanel'
 import SpacerSidebarPanel from './input-panels/SpacerSidebarPanel'
 import TextSidebarPanel from './input-panels/TextSidebarPanel'
+import VideoSidebarPanel from './input-panels/VideoSidebarPanel'
 
 function renderMessage(val: string) {
   return (
@@ -42,6 +46,8 @@ export default function ConfigurationPanel() {
   const setBlock = (conf: TEditorBlock) => setDocument({ [selectedBlockId]: conf })
   const { data, type } = block
   switch (type) {
+    case 'Accordion':
+      return <AccordionSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
     case 'Avatar':
       return <AvatarSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
     case 'Button':
@@ -54,6 +60,8 @@ export default function ConfigurationPanel() {
       )
     case 'Container':
       return <ContainerSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
+    case 'CountdownTimer':
+      return <CountdownTimerSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
     case 'Divider':
       return <DividerSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
     case 'Heading':
@@ -62,6 +70,8 @@ export default function ConfigurationPanel() {
       return <HtmlSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
     case 'Image':
       return <ImageSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
+    case 'ProgressBar':
+      return <ProgressBarSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
     case 'SocialLinks':
       return <SocialLinksSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
     case 'EmailLayout':
@@ -70,6 +80,8 @@ export default function ConfigurationPanel() {
       return <SpacerSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
     case 'Text':
       return <TextSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
+    case 'Video':
+      return <VideoSidebarPanel key={selectedBlockId} data={data} setData={(data) => setBlock({ type, data })} />
     default:
       return <pre>{JSON.stringify(block, null, '  ')}</pre>
   }

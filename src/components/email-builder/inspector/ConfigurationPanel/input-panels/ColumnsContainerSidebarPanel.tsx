@@ -10,7 +10,7 @@ type Props = {
   setData: (data: any) => void
 }
 
-const ALLOWED_KEYS = ['backgroundColor', 'padding']
+const ALLOWED_KEYS = ['backgroundColor', 'padding', 'borderColor', 'borderRadius']
 
 export default function ColumnsContainerSidebarPanel({ data, setData }: Props) {
   return (

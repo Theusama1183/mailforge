@@ -31,6 +31,9 @@ const HeadingBlockPropsSchema = z.object({
     padding: PADDING_SCHEMA,
     fontSize: z.number().optional().nullable(),
     borderRadius: z.number().optional().nullable(),
+    lineHeight: z.number().min(0.5).max(3).optional().nullable(),
+    letterSpacing: z.number().min(-2).max(10).optional().nullable(),
+    textTransform: z.enum(['none', 'uppercase', 'lowercase', 'capitalize']).optional().nullable(),
   }).optional().nullable(),
   props: z.object({
     text: z.string().optional().nullable(),

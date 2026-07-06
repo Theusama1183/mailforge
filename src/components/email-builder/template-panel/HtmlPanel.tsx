@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 
 import { Box } from '@mui/material'
-import { renderToStaticMarkup } from '@usewaypoint/email-builder'
+import { renderToHtml } from '@/components/email-builder/render-to-html'
 
 import { useDocument } from '../editor/EditorContext'
 
@@ -9,7 +9,7 @@ export default function HtmlPanel() {
   const document = useDocument()
   const html = useMemo(() => {
     try {
-      return renderToStaticMarkup(document, { rootBlockId: 'root' })
+      return renderToHtml(document, 'root')
     } catch {
       return 'Error rendering HTML'
     }

@@ -9,10 +9,14 @@ import {
   ImageOutlined,
   LibraryAddOutlined,
   NotesOutlined,
+  OndemandVideoOutlined,
   ShareOutlined,
   SmartButtonOutlined,
+  TimerOutlined,
   ViewColumnOutlined,
 } from '@mui/icons-material'
+import UnfoldMoreOutlined from '@mui/icons-material/UnfoldMoreOutlined'
+import ShowChartOutlined from '@mui/icons-material/ShowChartOutlined'
 
 import { TEditorBlock } from '../../../../editor/core'
 
@@ -202,6 +206,82 @@ export const BUTTONS: TButtonProps[] = [
           buttonFontSize: 14,
           textAlign: 'center',
         },
+      },
+    }),
+  },
+  {
+    label: 'Video',
+    icon: <OndemandVideoOutlined />,
+    block: () => ({
+      type: 'Video',
+      data: {
+        props: {
+          videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          alt: 'Video',
+          width: 560,
+        },
+        style: { padding: { top: 16, bottom: 16, left: 24, right: 24 }, textAlign: 'center' },
+      },
+    }),
+  },
+  {
+    label: 'Countdown Timer',
+    icon: <TimerOutlined />,
+    block: () => ({
+      type: 'CountdownTimer',
+      data: {
+        props: {
+          endDate: '2026-12-31T23:59:59',
+          endText: 'Offer ended!',
+          digitColor: '#111827',
+          labelColor: '#6B7280',
+          gap: 12,
+          showLabels: true,
+          labels: { days: 'Days', hours: 'Hours', mins: 'Mins', secs: 'Secs' },
+        },
+        style: { padding: { top: 16, bottom: 16, left: 24, right: 24 }, textAlign: 'center' },
+      },
+    }),
+  },
+  {
+    label: 'Progress Bar',
+    icon: <ShowChartOutlined />,
+    block: () => ({
+      type: 'ProgressBar',
+      data: {
+        props: {
+          percentage: 75,
+          label: 'Progress',
+          showPercentage: true,
+          barColor: '#3B82F6',
+          trackColor: '#E5E7EB',
+          height: 12,
+          borderRadius: 6,
+          labelPosition: 'above',
+        },
+        style: { padding: { top: 16, bottom: 16, left: 24, right: 24 } },
+      },
+    }),
+  },
+  {
+    label: 'FAQ / Accordion',
+    icon: <UnfoldMoreOutlined />,
+    block: () => ({
+      type: 'Accordion',
+      data: {
+        props: {
+          items: [
+            { title: 'How does it work?', content: 'Simply add your content and customize the design.', open: true },
+            { title: 'Is it free?', content: 'Yes, you can get started with our free plan.', open: false },
+          ],
+          titleColor: '#111827',
+          contentColor: '#6B7280',
+          borderColor: '#E5E7EB',
+          borderRadius: 8,
+          gap: 4,
+          backgroundColor: '#FFFFFF',
+        },
+        style: { padding: { top: 16, bottom: 16, left: 24, right: 24 } },
       },
     }),
   },

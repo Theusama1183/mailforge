@@ -57,6 +57,9 @@ export default function HeadingBlockEditor({ style, props }: HeadingBlockProps) 
     fontSize,
     padding: getPadding(style?.padding),
     borderRadius: style?.borderRadius ?? undefined,
+    lineHeight: style?.lineHeight ?? undefined,
+    letterSpacing: style?.letterSpacing != null ? `${style.letterSpacing}px` : undefined,
+    textTransform: (style?.textTransform as React.CSSProperties['textTransform']) ?? undefined,
   }
 
   const Tag = level as 'h1' | 'h2' | 'h3'

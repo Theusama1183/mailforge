@@ -55,6 +55,8 @@ export default function ButtonGroupSidebarPanel({ data, setData }: Props) {
         <Box key={i} sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 1, border: '1px solid #e0e0e0', borderRadius: 1 }}>
           <TextInput label={`Button ${i + 1} text`} value={btn.text} onChange={(v) => updateButton(i, 'text', v)} />
           <TextInput label={`Button ${i + 1} URL`} value={btn.url} onChange={(v) => updateButton(i, 'url', v)} />
+          <TextInput label="Left icon (emoji)" value={btn.leftIcon} onChange={(v) => updateButton(i, 'leftIcon', v)} />
+          <TextInput label="Right icon (emoji)" value={btn.rightIcon} onChange={(v) => updateButton(i, 'rightIcon', v)} />
           {buttons.length > 1 && (
             <Button size="small" color="error" onClick={() => removeButton(i)}>Remove</Button>
           )}
@@ -67,6 +69,8 @@ export default function ButtonGroupSidebarPanel({ data, setData }: Props) {
       <ColorInput label="Button background" value={style.buttonBackgroundColor} onChange={(buttonBackgroundColor) => setData({ ...data, style: { ...style, buttonBackgroundColor } })} />
       <ColorInput label="Button text color" value={style.buttonTextColor} onChange={(buttonTextColor) => setData({ ...data, style: { ...style, buttonTextColor } })} />
       <SliderInput label="Button border radius" value={style.buttonBorderRadius} onChange={(buttonBorderRadius) => setData({ ...data, style: { ...style, buttonBorderRadius } })} min={0} max={30} />
+      <SliderInput label="Button border width" value={style.buttonBorderWidth} onChange={(buttonBorderWidth) => setData({ ...data, style: { ...style, buttonBorderWidth } })} min={0} max={10} />
+      <ColorInput label="Button border color" value={style.buttonBorderColor} onChange={(buttonBorderColor) => setData({ ...data, style: { ...style, buttonBorderColor } })} />
       <FontSizeInput value={style.buttonFontSize} onChange={(buttonFontSize) => setData({ ...data, style: { ...style, buttonFontSize } })} />
       <PaddingInput value={style.buttonPadding} onChange={(buttonPadding) => setData({ ...data, style: { ...style, buttonPadding } })} />
       <BooleanInput label="Full width buttons" value={style.fullWidth ?? false} onChange={(fullWidth) => setData({ ...data, style: { ...style, fullWidth } })} />

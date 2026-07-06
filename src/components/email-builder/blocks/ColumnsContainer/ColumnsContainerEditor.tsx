@@ -50,11 +50,19 @@ export default function ColumnsContainerEditor({ style, props }: ColumnsContaine
         <EditorChildrenIds key={2} childrenIds={columnsValue[2]?.childrenIds} onChange={(change) => updateColumn(2, change)} />,
       ]
 
+  const wrapperStyle: React.CSSProperties = {
+    borderRadius: style?.borderRadius ?? undefined,
+    border: style?.borderColor ? `1px solid ${style.borderColor}` : undefined,
+    overflow: style?.borderRadius ? 'hidden' : undefined,
+  }
+
   return (
-    <BaseColumnsContainer
-      props={restProps}
-      style={style}
-      columns={colEditors}
-    />
+    <div style={wrapperStyle}>
+      <BaseColumnsContainer
+        props={restProps}
+        style={style}
+        columns={colEditors}
+      />
+    </div>
   )
 }

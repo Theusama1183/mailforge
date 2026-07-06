@@ -84,6 +84,18 @@ export default function SocialLinksSidebarPanel({ data, setData }: Props) {
       <ColorInput label="Icon background" value={style.iconBackgroundColor} onChange={(iconBackgroundColor) => setData({ ...data, style: { ...style, iconBackgroundColor } })} />
       <SliderInput label="Icon border radius" value={style.iconBorderRadius} onChange={(iconBorderRadius) => setData({ ...data, style: { ...style, iconBorderRadius } })} min={0} max={30} />
       <SliderInput label="Icon padding" value={style.iconPadding} onChange={(iconPadding) => setData({ ...data, style: { ...style, iconPadding } })} min={0} max={20} />
+      <SliderInput label="Border width" value={style.iconBorderWidth} onChange={(iconBorderWidth) => setData({ ...data, style: { ...style, iconBorderWidth } })} min={0} max={10} />
+      <ColorInput label="Border color" value={style.iconBorderColor} onChange={(iconBorderColor) => setData({ ...data, style: { ...style, iconBorderColor } })} />
+      <RadioGroupInput
+        label="Border style"
+        value={style.iconBorderStyle ?? 'solid'}
+        options={[
+          { value: 'solid', label: 'Solid' },
+          { value: 'dashed', label: 'Dashed' },
+          { value: 'dotted', label: 'Dotted' },
+        ]}
+        onChange={(iconBorderStyle) => setData({ ...data, style: { ...style, iconBorderStyle } })}
+      />
       <SingleStylePropertyPanel allowedKeys={ALLOWED_KEYS} style={style} onChange={(s) => setData({ ...data, style: { ...style, ...s } })} />
     </BaseSidebarPanel>
   )
