@@ -5,8 +5,9 @@ import { useParams, useRouter } from "next/navigation"
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
 import { createClient } from "@/lib/supabase/client"
 import { EmailViewer } from "@/components/inbox/email-viewer"
+import { ThreadConversation } from "@/components/inbox/thread-conversation"
 import { ComposeDialog } from "@/components/compose/compose-dialog"
-import { ArrowLeft, Mail, Trash2 } from "lucide-react"
+import { ArrowLeft, Mail, Pin, BellOff, Tag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import type { Email } from "@/types"
@@ -71,9 +72,13 @@ export default function EmailDetailPage() {
   const [notFound, setNotFound] = useState(false)
   const [showCompose, setShowCompose] = useState(false)
   const [composeMode, setComposeMode] = useState<ComposeMode>("reply")
+  const [threadEmails, setThreadEmails] = useState<Email[]>([])
   const [fromAddresses, setFromAddresses] = useState<
     { local_part: string; domain: string; full: string }[]
   >([])
+  const [emailLabels, setEmailLabels] = useState<{ id: string; name: string; color: string }[]>([])
+  const [allLabels, setAllLabels] = useState<{ id: string; name: string; color: string }[]>([])
+  const [showLabelPicker, setShowLabelPicker] = useState(false)
 
   useEffect(() => {
     const fetch = async () => {
@@ -104,7 +109,37 @@ export default function EmailDetailPage() {
       }
     }
     fetch()
+
+    // Fetch labels
+    const loadLabels = async () => {
+      try {
+        const res1 = await window.fetch(`/api/emails/${emailId}/labels`)
+        if (res1.ok) { const data = await res1.json(); if (Array.isArray(data)) setEmailLabels(data) }
+      } catch {}
+      try {
+        const res2 = await window.fetch("/api/labels")
+        if (res2.ok) { const data = await res2.json(); if (Array.isArray(data)) setAllLabels(data) }
+      } catch {}
+    }
+    loadLabels()
   }, [emailId, supabase])
+
+  // Fetch thread siblings
+  useEffect(() => {
+    if (!emailId) return
+    const fetchThread = async () => {
+      try {
+        const res = await fetch(`/api/emails/${emailId}/thread`)
+        if (res.ok) {
+          const data = await res.json()
+          setThreadEmails(data.emails || [])
+        }
+      } catch {
+        // Thread fetch is non-critical
+      }
+    }
+    fetchThread()
+  }, [emailId])
 
   // Fetch from addresses
   useEffect(() => {
@@ -134,9 +169,10 @@ export default function EmailDetailPage() {
       bcc: string[]
       subject: string
       body: string
+      textBody?: string
       fromAddress: string
       attachments?: { filename: string; content: string }[]
-      inReplyTo?: string
+      inReplyTo?: string; priority?: "low" | "normal" | "high"; readReceipt?: boolean
     }) => {
       try {
         const {
@@ -147,7 +183,7 @@ export default function EmailDetailPage() {
         const res = await fetch("/api/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...data, userId: user.id }),
+          body: JSON.stringify({ ...data, workspaceId, userId: user.id }),
         })
 
         if (!res.ok) {
@@ -159,11 +195,22 @@ export default function EmailDetailPage() {
 
         setShowCompose(false)
 
+        let cancelled = false
+        const timer = setTimeout(async () => {
+          if (!cancelled) {
+            try {
+              await fetch(`/api/send/confirm/${id}`, { method: "POST" })
+            } catch {}
+          }
+        }, 10000)
+
         toast("Message sent", {
-          description: "Undo available",
+          description: "Undo available (10s)",
           action: {
             label: "Undo",
             onClick: async () => {
+              cancelled = true
+              clearTimeout(timer)
               await fetch(`/api/send/cancel/${id}`, { method: "DELETE" })
               toast("Message unsent")
             },
@@ -196,6 +243,53 @@ export default function EmailDetailPage() {
     await supabase.from("emails").update({ folder: "archive" }).eq("id", email.id)
     router.push(`/${workspaceId}/inbox`)
   }, [email, supabase, router, workspaceId])
+
+  const handlePin = useCallback(async () => {
+    if (!email) return
+    const newPinned = !email.pinned
+    await supabase.from("emails").update({ pinned: newPinned }).eq("id", email.id)
+    setEmail(prev => prev ? { ...prev, pinned: newPinned } : null)
+    toast.success(newPinned ? "Pinned" : "Unpinned")
+  }, [email, supabase])
+
+  const handleSnooze = useCallback(async (until: string | null) => {
+    if (!email) return
+    await supabase.from("emails").update({ snoozed_until: until }).eq("id", email.id)
+    setEmail(prev => prev ? { ...prev, snoozed_until: until } : null)
+    if (until) {
+      toast.success("Snoozed until " + new Date(until).toLocaleString())
+      router.push(`/${workspaceId}/inbox`)
+    }
+  }, [email, supabase, router, workspaceId])
+
+  const handleToggleLabel = useCallback(async (labelId: string) => {
+    if (!email) return
+    const hasLabel = emailLabels.some(l => l.id === labelId)
+    const res = await fetch(`/api/emails/${email.id}/labels`, {
+      method: hasLabel ? "DELETE" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ labelIds: [labelId] }),
+    })
+    if (res.ok) {
+      const updated = await fetch(`/api/emails/${email.id}/labels`).then(r => r.json())
+      if (Array.isArray(updated)) setEmailLabels(updated)
+    }
+  }, [email, emailLabels])
+
+  const handleResend = useCallback(async () => {
+    if (!email) return
+    try {
+      const res = await fetch(`/api/emails/${email.id}/resend`, { method: "POST" })
+      if (!res.ok) {
+        const err = await res.json()
+        toast.error(err.error || "Failed to resend")
+        return
+      }
+      toast.success("Email queued for resend")
+    } catch {
+      toast.error("Failed to resend email")
+    }
+  }, [email])
 
   // Keyboard shortcuts (must be before early returns — Rules of Hooks)
   const shortcuts = useMemo(
@@ -291,7 +385,80 @@ export default function EmailDetailPage() {
           onStar={() => handleStar(email.id, !email.starred)}
           onDelete={handleDelete}
           onArchive={handleArchive}
+          onResend={handleResend}
+          onPin={handlePin}
+          onSnooze={() => {
+            const options = [
+              { label: "Later today", getValue: () => { const d = new Date(); d.setHours(18, 0, 0, 0); return d.toISOString() }},
+              { label: "Tomorrow", getValue: () => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d.toISOString() }},
+              { label: "This weekend", getValue: () => { const d = new Date(); d.setDate(d.getDate() + (6 - d.getDay())); d.setHours(9, 0, 0, 0); return d.toISOString() }},
+              { label: "Next week", getValue: () => { const d = new Date(); d.setDate(d.getDate() + (7 - d.getDay() + 1)); d.setHours(9, 0, 0, 0); return d.toISOString() }},
+            ]
+            toast("Snooze until...", {
+              description: (
+                <div className="flex flex-col gap-1 mt-1">
+                  {options.map(opt => (
+                    <button
+                      key={opt.label}
+                      className="text-left px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+                      onClick={() => handleSnooze(opt.getValue())}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                  <button
+                    className="text-left px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-sm text-gray-500"
+                    onClick={() => handleSnooze(null)}
+                  >
+                    Remove snooze
+                  </button>
+                </div>
+              ) as any,
+              duration: 10000,
+            })
+          }}
+          onLabel={() => setShowLabelPicker(!showLabelPicker)}
+          labels={emailLabels}
+          showLabelPicker={showLabelPicker}
         />
+
+        <ThreadConversation
+          threadEmails={threadEmails}
+          currentEmailId={email.id}
+        />
+
+        {/* Label picker overlay */}
+        {showLabelPicker && (
+          <div className="border-t border-gray-200 dark:border-gray-800 p-4 bg-gray-50 dark:bg-gray-900">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Labels</p>
+            <div className="flex flex-wrap gap-2">
+              {allLabels.map(label => {
+                const isActive = emailLabels.some(l => l.id === label.id)
+                return (
+                  <button
+                    key={label.id}
+                    onClick={() => handleToggleLabel(label.id)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                      isActive
+                        ? "ring-2 ring-offset-1 ring-offset-white dark:ring-offset-gray-900"
+                        : "opacity-60 hover:opacity-100"
+                    }`}
+                    style={{
+                      backgroundColor: label.color + "20",
+                      color: label.color,
+                      "--tw-ring-color": isActive ? label.color : undefined,
+                    } as React.CSSProperties}
+                  >
+                    {label.name}
+                  </button>
+                )
+              })}
+              {allLabels.length === 0 && (
+                <p className="text-xs text-gray-400">No labels yet. Create them in the sidebar.</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <ComposeDialog
@@ -299,7 +466,9 @@ export default function EmailDetailPage() {
         onClose={() => setShowCompose(false)}
         onSend={handleSend}
         fromAddresses={fromAddresses}
+        workspaceId={workspaceId}
         replyTo={{
+          id: email.id,
           to:
             composeMode === "forward"
               ? ""

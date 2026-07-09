@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { autoSaveContacts } from "@/lib/contacts"
+import crypto from "crypto"
 
 async function sendPushNotifications(userIds: string[], subject: string, fromAddress: string) {
   try {
@@ -82,16 +84,17 @@ export async function POST(req: Request) {
 
     const { data: emailAddr } = await emailAddrQuery.maybeSingle()
 
+    const incomingWorkspaceId = emailAddr?.workspace_id || null
     let userIds = [userId]
 
-    if (emailAddr?.workspace_id || emailAddr?.assigned_to) {
+    if (incomingWorkspaceId || emailAddr?.assigned_to) {
       if (emailAddr?.assigned_to) {
         userIds = [emailAddr.assigned_to]
-      } else if (emailAddr?.workspace_id) {
+      } else if (incomingWorkspaceId) {
         const { data: members } = await supabase
           .from("workspace_members")
           .select("user_id")
-          .eq("workspace_id", emailAddr.workspace_id)
+          .eq("workspace_id", incomingWorkspaceId)
 
         if (members) {
           userIds = members.map(m => m.user_id)
@@ -120,6 +123,10 @@ export async function POST(req: Request) {
     }
 
     console.log(`[webhook:${requestId}] Stored for ${userIds.length} user(s)`)
+
+    for (const uid of userIds) {
+      if (incomingWorkspaceId) autoSaveContacts(supabase, uid, incomingWorkspaceId, [fromAddress])
+    }
 
     // Send push notifications
     await sendPushNotifications(userIds, subject || "", fromAddress)

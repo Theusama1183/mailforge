@@ -1,13 +1,12 @@
 -- Fix workspace creation: add missing INSERT policy for workspaces
 -- The original migration had SELECT/UPDATE/DELETE but no INSERT policy
 
+DROP POLICY IF EXISTS "Users can create workspaces" ON public.workspaces;
 CREATE POLICY "Users can create workspaces"
   ON public.workspaces FOR INSERT
   WITH CHECK (created_by = auth.uid());
 
--- Allow users to insert themselves as members when creating a workspace
--- The existing policy only allows admins to manage members, but on creation
--- the user isn't an admin yet in the database. This policy covers that case.
+DROP POLICY IF EXISTS "Users can join as admin on creation" ON public.workspace_members;
 CREATE POLICY "Users can join as admin on creation"
   ON public.workspace_members FOR INSERT
   WITH CHECK (
@@ -29,6 +28,7 @@ CREATE TABLE IF NOT EXISTS public.user_preferences (
 
 ALTER TABLE public.user_preferences ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage their own preferences" ON public.user_preferences;
 CREATE POLICY "Users can manage their own preferences"
   ON public.user_preferences FOR ALL
   USING (user_id = auth.uid())

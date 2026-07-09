@@ -47,26 +47,30 @@ CREATE TABLE emails (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_emails_user_id ON emails(user_id);
-CREATE INDEX idx_emails_mailbox ON emails(mailbox_address);
-CREATE INDEX idx_emails_folder ON emails(folder);
-CREATE INDEX idx_emails_created ON emails(created_at DESC);
-CREATE INDEX idx_emails_user_folder ON emails(user_id, folder);
-CREATE INDEX idx_domains_user_id ON domains(user_id);
-CREATE INDEX idx_email_addresses_domain_id ON email_addresses(domain_id);
+CREATE INDEX IF NOT EXISTS idx_emails_user_id ON emails(user_id);
+CREATE INDEX IF NOT EXISTS idx_emails_mailbox ON emails(mailbox_address);
+CREATE INDEX IF NOT EXISTS idx_emails_folder ON emails(folder);
+CREATE INDEX IF NOT EXISTS idx_emails_created ON emails(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_emails_user_folder ON emails(user_id, folder);
+CREATE INDEX IF NOT EXISTS idx_domains_user_id ON domains(user_id);
+CREATE INDEX IF NOT EXISTS idx_email_addresses_domain_id ON email_addresses(domain_id);
 
 ALTER TABLE emails ENABLE ROW LEVEL SECURITY;
 ALTER TABLE domains ENABLE ROW LEVEL SECURITY;
 ALTER TABLE email_addresses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can read own emails" ON emails;
 CREATE POLICY "Users can read own emails" ON emails
   FOR ALL USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can read own domains" ON domains;
 CREATE POLICY "Users can read own domains" ON domains
   FOR ALL USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can read own email_addresses" ON email_addresses;
 CREATE POLICY "Users can read own email_addresses" ON email_addresses
   FOR ALL USING (
     domain_id IN (SELECT id FROM domains WHERE user_id = auth.uid())
   );
+DROP POLICY IF EXISTS "Users can read own profile" ON users;
 CREATE POLICY "Users can read own profile" ON users
   FOR ALL USING (auth.uid() = id);

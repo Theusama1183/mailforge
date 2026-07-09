@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { getAuthUser } from "@/lib/supabase/api-client"
 
 export async function POST(req: Request) {
   try {
+    const auth = await getAuthUser(req)
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { user } = auth
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
     const { domainId, localPart, domainName } = await req.json()
     if (!domainId || !localPart || !domainName) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -11,9 +17,31 @@ export async function POST(req: Request) {
     const supabase = await createClient()
     const { data: domain } = await supabase
       .from("domains")
-      .select("cloudflare_token, zone_id")
+      .select("cloudflare_token, zone_id, user_id")
       .eq("id", domainId)
       .single()
+
+    if (!domain) {
+      return NextResponse.json({ error: "Domain not found" }, { status: 404 })
+    }
+
+    if (domain.user_id !== user.id) {
+      const { data: emailAddresses } = await supabase
+        .from("email_addresses")
+        .select("workspace_id")
+        .eq("domain_id", domainId)
+      const wsIds = [...new Set((emailAddresses || []).map((e: any) => e.workspace_id).filter(Boolean))]
+      const { data: membership } = await supabase
+        .from("workspace_members")
+        .select("id")
+        .eq("user_id", user.id)
+        .in("workspace_id", wsIds)
+        .maybeSingle()
+
+      if (!membership) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+    }
 
     if (!domain?.cloudflare_token) {
       return NextResponse.json({ error: "Cloudflare token not configured for domain" }, { status: 400 })
@@ -64,6 +92,11 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
+    const auth = await getAuthUser(req)
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { user } = auth
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
     const { searchParams } = new URL(req.url)
     const emailId = searchParams.get("id")
     if (!emailId) {
@@ -73,7 +106,7 @@ export async function DELETE(req: Request) {
     const supabase = await createClient()
     const { data: emailAddr } = await supabase
       .from("email_addresses")
-      .select("local_part, domains!inner(domain, cloudflare_token, zone_id)")
+      .select("local_part, domains!inner(id, domain, cloudflare_token, zone_id, user_id)")
       .eq("id", emailId)
       .single()
 
@@ -82,6 +115,24 @@ export async function DELETE(req: Request) {
     }
 
     const domain = emailAddr.domains as any
+    if (domain.user_id !== user.id) {
+      const { data: emailAddresses } = await supabase
+        .from("email_addresses")
+        .select("workspace_id")
+        .eq("domain_id", domain.id)
+      const wsIds = [...new Set((emailAddresses || []).map((e: any) => e.workspace_id).filter(Boolean))]
+      const { data: membership } = await supabase
+        .from("workspace_members")
+        .select("id")
+        .eq("user_id", user.id)
+        .in("workspace_id", wsIds)
+        .maybeSingle()
+
+      if (!membership) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+    }
+
     if (domain.cloudflare_token && domain.zone_id) {
       const fullAddress = `${emailAddr.local_part}@${domain.domain}`
       const rulesRes = await fetch(

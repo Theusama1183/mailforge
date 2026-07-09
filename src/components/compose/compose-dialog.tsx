@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { RichEditor } from "./rich-editor"
+import { ContactAutocomplete } from "./contact-autocomplete"
 import { createClient } from "@/lib/supabase/client"
-import { X, Minus, Send, Paperclip, FileText, Mail, LayoutTemplate } from "lucide-react"
+import { toast } from "sonner"
+import { X, Minus, Send, Paperclip, FileText, Mail, LayoutTemplate, Flag, Check, Signature } from "lucide-react"
 
 const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024
 const ALLOWED_FILE_TYPES = [
@@ -32,6 +34,7 @@ interface Attachment {
 }
 
 interface ReplyToData {
+  id?: string
   to: string
   subject: string
   body: string
@@ -58,12 +61,14 @@ export function ComposeDialog({
   onSend,
   fromAddresses = [],
   replyTo,
+  workspaceId,
 }: {
   open: boolean
   onClose: () => void
-  onSend: (data: { to: string[]; cc: string[]; bcc: string[]; subject: string; body: string; fromAddress: string; attachments?: Attachment[]; inReplyTo?: string }) => void
+  onSend: (data: { to: string[]; cc: string[]; bcc: string[]; subject: string; body: string; textBody?: string; fromAddress: string; attachments?: Attachment[]; inReplyTo?: string; priority?: "low" | "normal" | "high"; readReceipt?: boolean }) => void
   fromAddresses?: FromAddress[]
   replyTo?: ReplyToData
+  workspaceId?: string
 }) {
   const [fromIndex, setFromIndex] = useState(0)
   const [to, setTo] = useState(replyTo?.to || "")
@@ -94,23 +99,38 @@ export function ComposeDialog({
   const [minimized, setMinimized] = useState(false)
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [sending, setSending] = useState(false)
+  const [draftId, setDraftId] = useState<string | null>(null)
   const [templates, setTemplates] = useState<Template[]>([])
   const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>({})
   const [showTemplates, setShowTemplates] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editedHtml, setEditedHtml] = useState("")
   const [attachmentError, setAttachmentError] = useState<string | null>(null)
+  const [priority, setPriority] = useState<"low" | "normal" | "high">("normal")
+  const [requestReadReceipt, setRequestReadReceipt] = useState(false)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
+  const [signatures, setSignatures] = useState<{ id: string; name: string; content: string; is_default: boolean }[]>([])
+  const [selectedSignatureId, setSelectedSignatureId] = useState<string | null>(null)
+  const [showSignatures, setShowSignatures] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+  const prevDraftKeyRef = useRef("")
 
   useEffect(() => {
     if (!open) return
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
-      supabase.from("templates").select("id, name, subject, body_html, body_text").eq("user_id", user.id).then(({ data }) => {
-        setTemplates(data || [])
+      Promise.all([
+        supabase.from("templates").select("id, name, subject, body_html, body_text").eq("user_id", user.id),
+        supabase.from("user_signatures").select("id, name, content, is_default").eq("user_id", user.id).order("is_default", { ascending: false }),
+      ]).then(([templatesResult, signaturesResult]) => {
+        setTemplates(templatesResult.data || [])
+        const sigs = signaturesResult.data || []
+        setSignatures(sigs)
+        const defaultSig = sigs.find(s => s.is_default)
+        if (defaultSig) setSelectedSignatureId(defaultSig.id)
       })
     })
   }, [open])
@@ -151,6 +171,79 @@ export function ComposeDialog({
       }
     }
   }, [isEditing])
+
+  // Auto-save draft to localStorage
+  const DRAFT_KEY = useMemo(() => {
+    if (!fromAddresses.length) return ""
+    const addr = fromAddresses[fromIndex]?.full || "draft"
+    return `mailforge_draft_${addr}_${replyTo?.mode || "new"}`
+  }, [fromAddresses, fromIndex, replyTo])
+
+  useEffect(() => {
+    if (prevDraftKeyRef.current && prevDraftKeyRef.current !== DRAFT_KEY) {
+      try { localStorage.removeItem(prevDraftKeyRef.current) } catch {}
+    }
+    prevDraftKeyRef.current = DRAFT_KEY
+  }, [DRAFT_KEY])
+
+  useEffect(() => {
+    if (!open) return
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY)
+      if (saved) {
+        const draft = JSON.parse(saved)
+        if (draft.timestamp && Date.now() - draft.timestamp < 3600000) {
+          if (draft.to) setTo(draft.to)
+          if (draft.cc) { setCc(draft.cc); if (draft.cc) setShowCc(true) }
+          if (draft.bcc) { setBcc(draft.bcc); if (draft.bcc) setShowBcc(true) }
+          if (draft.subject) setSubject(draft.subject)
+          if (draft.bodyHtml) { setBodyHtml(draft.bodyHtml); setEditedHtml(draft.bodyHtml) }
+          if (draft.bodyText) setBodyText(draft.bodyText)
+          if (draft.priority) setPriority(draft.priority)
+          if (draft.readReceipt) setRequestReadReceipt(draft.readReceipt)
+          if (draft.templateHtml) { setTemplateHtml(draft.templateHtml); if (draft.isEditing) setIsEditing(true) }
+        }
+      }
+    } catch {}
+  }, [open, DRAFT_KEY])
+
+  useEffect(() => {
+    if (!open || minimized || sending) return
+    const interval = setInterval(() => {
+      try {
+        const draft = {
+          to, cc: showCc ? cc : "", bcc: showBcc ? bcc : "",
+          subject, bodyHtml, bodyText, priority, readReceipt: requestReadReceipt,
+          templateHtml: templateHtml || "", isEditing,
+          timestamp: Date.now(),
+        }
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+      } catch {}
+      if (to || subject || bodyHtml) {
+        fetch("/api/drafts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: draftId,
+            to: to ? to.split(",").map(s => s.trim()).filter(Boolean) : [],
+            cc: showCc && cc ? cc.split(",").map(s => s.trim()).filter(Boolean) : [],
+            bcc: showBcc && bcc ? bcc.split(",").map(s => s.trim()).filter(Boolean) : [],
+            subject,
+            body: bodyHtml,
+            textBody: bodyText,
+            fromAddress: fromAddresses[fromIndex]?.full || "",
+          }),
+        }).then(res => {
+          if (res.ok) res.json().then(d => { if (!draftId && d.id) setDraftId(d.id) })
+        }).catch(() => {})
+      }
+    }, 15000)
+    return () => clearInterval(interval)
+  }, [open, minimized, sending, to, cc, showCc, bcc, showBcc, subject, bodyHtml, bodyText, priority, requestReadReceipt, DRAFT_KEY, draftId, fromAddresses, fromIndex])
+
+  const clearDraft = () => {
+    try { localStorage.removeItem(DRAFT_KEY) } catch {}
+  }
 
   useEffect(() => {
     if (!open || minimized) return
@@ -193,6 +286,22 @@ export function ComposeDialog({
       previouslyFocused?.focus()
     }
   }, [open, minimized])
+
+  function insertSignature(sigId: string) {
+    setShowSignatures(false)
+    setSelectedSignatureId(sigId === selectedSignatureId ? null : sigId)
+    const sig = signatures.find(s => s.id === sigId)
+    if (!sig || !sig.content) return
+    const sigHtml = `<br><br>--<br>${sig.content}`
+    if (bodyHtml.includes("--<br>")) {
+      const withoutSig = bodyHtml.replace(/<br><br>--<br>[\s\S]*$/, "")
+      setBodyHtml(withoutSig + sigHtml)
+      setBodyText((bodyText || "").replace(/\n\n--[\s\S]*$/, "") + "\n\n--\n" + sig.content.replace(/<[^>]+>/g, ""))
+    } else {
+      setBodyHtml(bodyHtml + sigHtml)
+      setBodyText((bodyText || "") + "\n\n--\n" + sig.content.replace(/<[^>]+>/g, ""))
+    }
+  }
 
   function handleTemplateSelect(templateId: string) {
     setShowTemplates(false)
@@ -282,19 +391,49 @@ export function ComposeDialog({
       const finalBody = templateHtml
         ? replacePlaceholders(htmlContent || templateHtml)
         : replacePlaceholders(bodyHtml || bodyText)
+      const textContent = isEditing
+        ? (contentRef.current?.textContent || bodyText)
+        : bodyText
       await onSend({
         to: to.split(",").map((s) => s.trim()).filter(Boolean),
         cc: showCc ? cc.split(",").map((s) => s.trim()).filter(Boolean) : [],
         bcc: showBcc ? bcc.split(",").map((s) => s.trim()).filter(Boolean) : [],
         subject: finalSubject,
         body: finalBody,
+        textBody: textContent,
         fromAddress: fromAddresses[fromIndex]?.full || "",
         attachments: attachments.length > 0 ? attachments : undefined,
-        inReplyTo: replyTo?.mode === "reply" || replyTo?.mode === "replyAll" ? replyTo.subject : undefined,
+        inReplyTo: replyTo?.id || undefined,
+        priority,
+        readReceipt: requestReadReceipt,
       })
+      clearDraft()
+      if (draftId) {
+        setDraftId(null)
+        fetch(`/api/emails/${draftId}`, { method: "DELETE" }).catch(() => {})
+      }
     } finally {
       setSending(false)
     }
+  }
+
+  const handleClose = () => {
+    const hasContent = to || cc || bcc || subject || bodyHtml || bodyText || attachments.length > 0
+    if (hasContent) {
+      setShowDiscardConfirm(true)
+    } else {
+      onClose()
+    }
+  }
+
+  const handleDiscardConfirm = () => {
+    clearDraft()
+    if (draftId) {
+      setDraftId(null)
+      fetch(`/api/emails/${draftId}`, { method: "DELETE" }).catch(() => {})
+    }
+    setShowDiscardConfirm(false)
+    onClose()
   }
 
   const handleEditorChange = useCallback((html: string, text: string) => {
@@ -350,7 +489,7 @@ export function ComposeDialog({
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{modeLabel}</span>
           <div className="flex items-center gap-1">
             <button onClick={() => setMinimized(true)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded" aria-label="Minimize compose window"><Minus className="h-3.5 w-3.5 text-gray-500" /></button>
-            <button onClick={onClose} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded" aria-label="Close and discard draft"><X className="h-3.5 w-3.5 text-gray-500" /></button>
+            <button onClick={handleClose} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded" aria-label="Close and discard draft"><X className="h-3.5 w-3.5 text-gray-500" /></button>
           </div>
         </div>
 
@@ -373,13 +512,7 @@ export function ComposeDialog({
 
           <div className="flex items-center gap-2">
             <label htmlFor="compose-to" className="text-xs font-medium text-gray-500 w-8 shrink-0">To</label>
-            <Input
-              id="compose-to"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              placeholder="Recipients"
-              className="border-0 border-b border-gray-100 dark:border-gray-700 rounded-none px-0 h-8 text-sm focus:ring-0"
-            />
+            <ContactAutocomplete id="compose-to" value={to} onChange={setTo} placeholder="Recipients" workspaceId={workspaceId} />
             <div className="flex gap-2 shrink-0">
               {!showCc && <Button variant="ghost" size="sm" onClick={() => setShowCc(true)} className="text-xs text-blue-600 hover:text-blue-700 h-auto px-1" aria-label="Add Cc field">Cc</Button>}
               {!showBcc && <Button variant="ghost" size="sm" onClick={() => setShowBcc(true)} className="text-xs text-blue-600 hover:text-blue-700 h-auto px-1" aria-label="Add Bcc field">Bcc</Button>}
@@ -389,14 +522,14 @@ export function ComposeDialog({
           {showCc && (
             <div className="flex items-center gap-2">
               <label htmlFor="compose-cc" className="text-xs font-medium text-gray-500 w-8 shrink-0">Cc</label>
-              <Input id="compose-cc" value={cc} onChange={(e) => setCc(e.target.value)} placeholder="Cc recipients" className="border-0 border-b border-gray-100 dark:border-gray-700 rounded-none px-0 h-8 text-sm focus:ring-0" />
+              <ContactAutocomplete id="compose-cc" value={cc} onChange={setCc} placeholder="Cc recipients" workspaceId={workspaceId} />
             </div>
           )}
 
           {showBcc && (
             <div className="flex items-center gap-2">
               <label htmlFor="compose-bcc" className="text-xs font-medium text-gray-500 w-8 shrink-0">Bcc</label>
-              <Input id="compose-bcc" value={bcc} onChange={(e) => setBcc(e.target.value)} placeholder="Bcc recipients" className="border-0 border-b border-gray-100 dark:border-gray-700 rounded-none px-0 h-8 text-sm focus:ring-0" />
+              <ContactAutocomplete id="compose-bcc" value={bcc} onChange={setBcc} placeholder="Bcc recipients" workspaceId={workspaceId} />
             </div>
           )}
 
@@ -457,12 +590,38 @@ export function ComposeDialog({
               />
             </div>
           ) : (
-            <RichEditor value={bodyText} onChange={handleEditorChange} placeholder="Write your message..." />
+            <RichEditor value={bodyHtml || bodyText} onChange={handleEditorChange} placeholder="Write your message..." />
           )}
 
           {attachmentError && (
             <p className="text-xs text-red-500" role="alert">{attachmentError}</p>
           )}
+
+          <div className="flex items-center gap-4 pt-1">
+            <div className="flex items-center gap-2">
+              <Flag className={`h-3.5 w-3.5 ${priority === "high" ? "text-red-500" : priority === "low" ? "text-blue-400" : "text-gray-400"}`} />
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value as "low" | "normal" | "high")}
+                className="text-xs border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                aria-label="Priority"
+              >
+                <option value="low">Low priority</option>
+                <option value="normal">Normal</option>
+                <option value="high">High priority</option>
+              </select>
+            </div>
+
+            <label className="flex items-center gap-1.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={requestReadReceipt}
+                onChange={(e) => setRequestReadReceipt(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-xs text-gray-500 dark:text-gray-400">Request read receipt</span>
+            </label>
+          </div>
 
           {attachments.length > 0 && (
             <div className="space-y-1" role="list" aria-label="File attachments">
@@ -481,6 +640,36 @@ export function ComposeDialog({
 
         <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700 shrink-0">
           <div className="flex items-center gap-2">
+            <Button onClick={() => {
+              if (to || subject || bodyHtml) {
+                fetch("/api/drafts", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    id: draftId,
+                    to: to ? to.split(",").map(s => s.trim()).filter(Boolean) : [],
+                    cc: showCc && cc ? cc.split(",").map(s => s.trim()).filter(Boolean) : [],
+                    bcc: showBcc && bcc ? bcc.split(",").map(s => s.trim()).filter(Boolean) : [],
+                    subject,
+                    body: bodyHtml,
+                    textBody: bodyText,
+                    fromAddress: fromAddresses[fromIndex]?.full || "",
+                  }),
+                }).then(res => {
+                  if (res.ok) {
+                    res.json().then(d => {
+                      if (!draftId && d.id) setDraftId(d.id);
+                      toast.success("Draft saved")
+                    })
+                  } else {
+                    toast.error("Failed to save draft")
+                  }
+                }).catch(() => toast.error("Failed to save draft"))
+              }
+            }} disabled={sending || (!to && !subject && !bodyHtml)} variant="ghost" size="sm" className="text-gray-500">
+              <FileText className="h-3.5 w-3.5 mr-1" />
+              Save
+            </Button>
             <Button onClick={handleSend} disabled={sending || !to.trim()} className="gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60" aria-label="Send email">
               {sending ? (
                 <div className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" />
@@ -526,12 +715,73 @@ export function ComposeDialog({
                 )}
               </div>
             )}
+            <div className="relative">
+              <Button variant="ghost" size="icon"
+                onClick={() => setShowSignatures(!showSignatures)}
+                className={`text-gray-400 hover:text-gray-600 ${selectedSignatureId ? "text-blue-500" : ""}`}
+                aria-label="Insert signature"
+                aria-expanded={showSignatures}
+              >
+                <Signature className="h-4 w-4" />
+              </Button>
+              {showSignatures && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowSignatures(false)} aria-hidden="true" />
+                  <div className="absolute bottom-full left-0 mb-1 w-56 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-20 max-h-48 overflow-y-auto" role="listbox" aria-label="Select a signature">
+                    {signatures.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-gray-400">No signatures. Add one in Settings.</div>
+                    )}
+                    {signatures.map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => insertSignature(s.id)}
+                        className={`w-full text-left px-3 py-2 text-sm truncate hover:bg-gray-50 dark:hover:bg-gray-800 ${selectedSignatureId === s.id ? "text-blue-600 dark:text-blue-400 font-medium" : "text-gray-700 dark:text-gray-300"}`}
+                        role="option"
+                      >
+                        {s.name} {s.is_default && <Check className="h-3 w-3 inline ml-1" />}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} className="text-gray-400">
+          <Button variant="ghost" size="sm" onClick={() => {
+            clearDraft()
+            if (draftId) {
+              setDraftId(null)
+              fetch(`/api/emails/${draftId}`, { method: "DELETE" }).catch(() => {})
+            }
+            onClose()
+          }} className="text-gray-400">
             Discard
           </Button>
         </div>
       </div>
+
+      {showDiscardConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" onClick={() => setShowDiscardConfirm(false)}>
+          <div
+            className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+            role="alertdialog"
+            aria-label="Discard draft"
+          >
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Discard draft?</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+              You have unsaved changes. If you discard now, this draft will be lost.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setShowDiscardConfirm(false)}>
+                Keep editing
+              </Button>
+              <Button variant="ghost" size="sm" onClick={handleDiscardConfirm} className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950">
+                Discard
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

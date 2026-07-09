@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     const { user, supabase } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const rl = checkRateLimit(`get:${user.id}`, RATE_LIMITS.emails)
+    const rl = await checkRateLimit(`get:${user.id}`, RATE_LIMITS.emails)
     if (!rl.allowed) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } })
     }
@@ -71,7 +71,7 @@ export async function PATCH(req: Request) {
     const { user, supabase } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const rl = checkRateLimit(`bulk-patch:${user.id}`, RATE_LIMITS.bulk)
+    const rl = await checkRateLimit(`bulk-patch:${user.id}`, RATE_LIMITS.bulk)
     if (!rl.allowed) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } })
     }
@@ -120,7 +120,7 @@ export async function DELETE(req: Request) {
     const { user, supabase } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const rl = checkRateLimit(`bulk-delete:${user.id}`, RATE_LIMITS.bulk)
+    const rl = await checkRateLimit(`bulk-delete:${user.id}`, RATE_LIMITS.bulk)
     if (!rl.allowed) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } })
     }

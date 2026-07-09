@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.invitations (
 
 ALTER TABLE public.invitations ENABLE ROW LEVEL SECURITY;
 
--- Workspace admins can view/create/cancel invitations for their workspace
+DROP POLICY IF EXISTS "Admins can manage invitations" ON public.invitations;
 CREATE POLICY "Admins can manage invitations"
   ON public.invitations FOR ALL
   USING (
@@ -22,7 +22,7 @@ CREATE POLICY "Admins can manage invitations"
     )
   );
 
--- Anyone can view a specific invitation by token (for acceptance page)
+DROP POLICY IF EXISTS "Anyone can view by token" ON public.invitations;
 CREATE POLICY "Anyone can view by token"
   ON public.invitations FOR SELECT
   USING (true);

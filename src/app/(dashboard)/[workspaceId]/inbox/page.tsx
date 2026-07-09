@@ -7,8 +7,9 @@ import type { SelectType } from "@/components/inbox/inbox-toolbar"
 import { ComposeDialog } from "@/components/compose/compose-dialog"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ChevronDown, Mail, Search as SearchIcon } from "lucide-react"
+import { ChevronDown, Mail, Search as SearchIcon, Clock, Pin, Filter, X as XIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { PageHeader } from "@/components/page-header"
 import { toast } from "sonner"
 import { useEmailSearch } from "@/hooks/use-email-search"
@@ -19,6 +20,14 @@ import type { Email } from "@/types"
 
 export const dynamic = "force-dynamic"
 
+const SNOOZE_OPTIONS = [
+  { label: "Later today", value: "18:00" },
+  { label: "Tomorrow", value: "tomorrow" },
+  { label: "This weekend", value: "weekend" },
+  { label: "Next week", value: "nextweek" },
+  { label: "Pick date", value: "custom" },
+]
+
 export default function DashboardPage() {
   const [currentFolder, setCurrentFolder] = useState("inbox")
   const [emails, setEmails] = useState<Email[]>([])
@@ -28,8 +37,17 @@ export default function DashboardPage() {
   const [showAddressDropdown, setShowAddressDropdown] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [showSearch, setShowSearch] = useState(false)
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [filterFrom, setFilterFrom] = useState("")
+  const [filterTo, setFilterTo] = useState("")
+  const [filterSubject, setFilterSubject] = useState("")
+  const [filterHasAttachment, setFilterHasAttachment] = useState<boolean | undefined>(undefined)
+  const [filterBefore, setFilterBefore] = useState("")
+  const [filterAfter, setFilterAfter] = useState("")
   const [page, setPage] = useState(0)
   const [totalCount, setTotalCount] = useState(0)
+  const [selectedEmailId, setSelectedEmailId] = useState<string | undefined>(undefined)
+  const [showSnoozePicker, setShowSnoozePicker] = useState<string | null>(null)
   const pageSize = 50
   const searchInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
@@ -39,14 +57,14 @@ export default function DashboardPage() {
   const [fromAddresses, setFromAddresses] = useState<{ local_part: string; domain: string; full: string }[]>([])
   const [workspaceId, setWorkspaceId] = useState<string>("")
 
-  // Extract workspaceId from URL
+  const isLabelFolder = currentFolder.startsWith("label:")
+
   useEffect(() => {
     const path = window.location.pathname
     const segments = path.split("/").filter(Boolean)
     if (segments.length > 0) setWorkspaceId(segments[0])
   }, [])
 
-  // Sync URL params with state
   useEffect(() => {
     const folder = searchParams.get("folder")
     const compose = searchParams.get("compose")
@@ -64,7 +82,7 @@ export default function DashboardPage() {
     try {
       setLoading(true)
 
-      // Fetch from addresses via workspace API (works for members too)
+      // Fetch from addresses via workspace API
       if (fromAddresses.length === 0 && workspaceId) {
         try {
           const res = await fetch(`/api/workspaces/${workspaceId}/emails`)
@@ -81,14 +99,47 @@ export default function DashboardPage() {
         } catch {}
       }
 
+      // Label folder: fetch emails by label
+      if (currentFolder.startsWith("label:")) {
+        const labelId = currentFolder.replace("label:", "")
+        const res = await fetch(`/api/emails/${labelId}/labels`)
+        if (res.ok) {
+          const emails = await res.json()
+          setEmails(Array.isArray(emails) ? emails : [])
+          setTotalCount(Array.isArray(emails) ? emails.length : 0)
+        }
+        setLoading(false)
+        return
+      }
+
+      // Server-side search when query is long enough
+      if (searchQuery.length >= 2 && !isLabelFolder) {
+        const params = new URLSearchParams({ q: searchQuery, limit: String(pageSize), page: String(page) })
+        if (selectedAddress !== "all") params.set("address", selectedAddress)
+        if (filterFrom) params.set("from", filterFrom)
+        if (filterTo) params.set("to", filterTo)
+        if (filterSubject) params.set("subject", filterSubject)
+        if (filterHasAttachment !== undefined) params.set("has_attachment", String(filterHasAttachment))
+        if (filterBefore) params.set("before", filterBefore)
+        if (filterAfter) params.set("after", filterAfter)
+        if (workspaceId) params.set("workspace_id", workspaceId)
+
+        const res = await fetch(`/api/search?${params}`)
+        if (res.ok) {
+          const data = await res.json()
+          setEmails(data.emails || [])
+          setTotalCount(data.total || 0)
+        }
+        setLoading(false)
+        return
+      }
+
       const params = new URLSearchParams({
         folder: currentFolder,
         limit: String(pageSize),
         offset: String(page * pageSize),
       })
-      if (selectedAddress !== "all") {
-        params.set("address", selectedAddress)
-      }
+      if (selectedAddress !== "all") params.set("address", selectedAddress)
 
       const res = await fetch(`/api/emails?${params}`)
 
@@ -107,7 +158,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }, [currentFolder, selectedAddress, page, pageSize, fromAddresses.length, workspaceId])
+  }, [currentFolder, selectedAddress, page, pageSize, fromAddresses.length, workspaceId, searchQuery, filterFrom, filterTo, filterSubject, filterHasAttachment, filterBefore, filterAfter, isLabelFolder])
 
   useEffect(() => {
     fetchEmails()
@@ -116,46 +167,68 @@ export default function DashboardPage() {
   // Realtime subscription via extracted hook
   useRealtimeEmails(fetchEmails, true)
 
-  // Thread grouping
-  const normalizeSubject = (s: string) =>
-    s?.replace(/^(Re|Fwd|Aw|Wg):\s*/i, "").trim().toLowerCase() || ""
+  // Thread grouping using message_id / in_reply_to / references chain
+  const getThreadKey = (email: Email): string => {
+    if (email.references && email.references.length > 0) return email.references[0]
+    if (email.in_reply_to) return email.in_reply_to
+    if (email.message_id) return email.message_id
+    const normalized = email.subject
+      ?.replace(/^(Re|Fwd|Aw|Wg):\s*/i, "")
+      .trim()
+      .toLowerCase() || ""
+    return `subject:${normalized}`
+  }
 
   const threadGroups = useMemo(() => {
     const groups = new Map<string, Email[]>()
     for (const email of emails) {
-      const key = email.in_reply_to || normalizeSubject(email.subject || "")
+      const key = getThreadKey(email)
       if (!groups.has(key)) groups.set(key, [])
       groups.get(key)!.push(email)
     }
     return groups
   }, [emails])
 
-  const threadedEmails = useMemo(
-    () =>
-      emails.filter((e) => {
-        const key = e.in_reply_to || normalizeSubject(e.subject || "")
-        const group = threadGroups.get(key)
-        return group ? group[0] === e : true
-      }),
-    [emails, threadGroups]
-  )
+  const threadedEmails = useMemo(() => {
+    const seen = new Set<string>()
+    const result: Email[] = []
+    const sorted = [...emails].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+    for (const email of sorted) {
+      const key = getThreadKey(email)
+      if (!seen.has(key)) {
+        seen.add(key)
+        result.push(email)
+      }
+    }
+    return result
+  }, [emails])
 
-  const threadCounts = useMemo(
-    () =>
-      Object.fromEntries(
-        Array.from(threadGroups.entries())
-          .filter(([_, groupEmails]) => groupEmails.length > 1)
-          .map(([key, groupEmails]) => {
-            const e = groupEmails.find((em) => em.in_reply_to === key) || groupEmails[0]
-            return [e.id, groupEmails.length]
-          })
-      ),
-    [threadGroups]
-  )
+  const threadCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const email of threadedEmails) {
+      const key = getThreadKey(email)
+      const group = threadGroups.get(key)
+      if (group && group.length > 1) {
+        counts[email.id] = group.length
+      }
+    }
+    return counts
+  }, [threadedEmails, threadGroups])
+
+  // Sort: pinned emails first
+  const sortedEmails = useMemo(() => {
+    return [...emails].sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1
+      if (!a.pinned && b.pinned) return 1
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    })
+  }, [emails])
 
   // Client-side search via extracted hook
-  const searchResults = useEmailSearch(emails, searchQuery)
-  const displayEmails = searchResults ?? threadedEmails
+  const searchResults = useEmailSearch(sortedEmails, searchQuery)
+  const displayEmails = searchQuery.length > 0 && searchQuery.length < 2 ? (searchResults ?? sortedEmails) : sortedEmails
 
   // Ctrl+F shortcut
   useEffect(() => {
@@ -188,12 +261,12 @@ export default function DashboardPage() {
   useKeyboardShortcuts(shortcuts)
 
   // Action handlers
-  const handleSend = async (data: { to: string[]; cc: string[]; bcc: string[]; subject: string; body: string; fromAddress: string; attachments?: { filename: string; content: string }[]; inReplyTo?: string }) => {
+  const handleSend = async (data: { to: string[]; cc: string[]; bcc: string[]; subject: string; body: string; textBody?: string; fromAddress: string; attachments?: { filename: string; content: string }[]; inReplyTo?: string; priority?: "low" | "normal" | "high"; readReceipt?: boolean }) => {
     try {
       const res = await fetch("/api/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data }),
+        body: JSON.stringify({ ...data, workspaceId }),
       })
 
       if (!res.ok) {
@@ -206,11 +279,23 @@ export default function DashboardPage() {
       setShowCompose(false)
       fetchEmails()
 
+      let cancelled = false
+      const timer = setTimeout(async () => {
+        if (!cancelled) {
+          try {
+            await fetch(`/api/send/confirm/${id}`, { method: "POST" })
+            fetchEmails()
+          } catch {}
+        }
+      }, 10000)
+
       toast("Message sent", {
-        description: "Undo available",
+        description: "Undo available (10s)",
         action: {
           label: "Undo",
           onClick: async () => {
+            cancelled = true
+            clearTimeout(timer)
             await fetch(`/api/send/cancel/${id}`, { method: "DELETE" })
             fetchEmails()
             toast("Message unsent")
@@ -236,6 +321,7 @@ export default function DashboardPage() {
   }
 
   const handleSelect = async (id: string) => {
+    setSelectedEmailId(id)
     const email = emails.find((e) => e.id === id)
     if (email && !email.read) {
       const res = await fetch(`/api/emails/${id}`, {
@@ -247,6 +333,9 @@ export default function DashboardPage() {
         setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, read: true } : e)))
       }
     }
+  }
+
+  const handleNavigate = (id: string) => {
     router.push(`/${workspaceId}/inbox/${id}`)
   }
 
@@ -283,6 +372,45 @@ export default function DashboardPage() {
     if (res.status === 429) { toast.error("Too many requests"); return }
     if (res.ok) {
       setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, read: !wasRead } : e)))
+    }
+  }
+
+  const handlePin = async (id: string, pinned: boolean) => {
+    const res = await fetch(`/api/emails/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned }),
+    })
+    if (res.status === 429) { toast.error("Too many requests"); return }
+    if (res.ok) {
+      setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, pinned } : e)))
+    }
+  }
+
+  const handleSnooze = async (id: string, until: string | null) => {
+    const res = await fetch(`/api/emails/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ snoozed_until: until }),
+    })
+    if (res.status === 429) { toast.error("Too many requests"); return }
+    if (res.ok) {
+      setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, snoozed_until: until } : e)))
+      if (until) {
+        toast.success("Snoozed until " + new Date(until).toLocaleString())
+        setEmails((prev) => prev.filter((e) => e.id !== id))
+      }
+    }
+  }
+
+  const handleAssignLabels = async (emailId: string, labelIds: string[]) => {
+    const res = await fetch(`/api/emails/${emailId}/labels`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ labelIds }),
+    })
+    if (res.ok) {
+      fetchEmails()
     }
   }
 
@@ -405,17 +533,19 @@ export default function DashboardPage() {
   }, [])
 
   const handleFolderChange = (folder: string) => {
-    if (["settings", "analytics", "templates", "imap-sync", "workspaces"].includes(folder)) {
+    if (["settings", "analytics", "templates", "imap-sync", "workspaces", "contacts"].includes(folder)) {
       const routeMap: Record<string, string> = {
         settings: `/${workspaceId}/settings`,
         analytics: `/${workspaceId}/analytics`,
         templates: `/${workspaceId}/templates`,
         "imap-sync": `/${workspaceId}/imap-sync`,
         workspaces: "/workspaces",
+        contacts: `/${workspaceId}/contacts`,
       }
       router.push(routeMap[folder])
       return
     }
+    setSearchQuery("")
     setCurrentFolder(folder)
     setPage(0)
     router.push(`/${workspaceId}/inbox?folder=${folder}`, { scroll: false })
@@ -431,6 +561,7 @@ export default function DashboardPage() {
           currentFolder === "inbox" ? "Inbox" :
           currentFolder === "sent" ? "Sent" :
           currentFolder === "starred" ? "Starred" :
+          currentFolder.startsWith("label:") ? `Label: ${currentFolder.replace("label:", "")}` :
           currentFolder.charAt(0).toUpperCase() + currentFolder.slice(1)
         }
         actions={
@@ -504,7 +635,7 @@ export default function DashboardPage() {
       </PageHeader>
 
       {showSearch && (
-        <div className="px-6 py-3 border-b border-gray-100 dark:border-gray-800">
+        <div className="px-6 py-3 border-b border-gray-100 dark:border-gray-800 space-y-2">
           <div className="relative">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" aria-hidden="true" />
             <input
@@ -512,11 +643,65 @@ export default function DashboardPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search emails..."
+              placeholder="Search emails... (min 2 chars for server search)"
               aria-label="Search emails"
-              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-9 pr-10 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <button
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className={`absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded ${showAdvancedFilters ? "bg-blue-100 dark:bg-blue-900/50 text-blue-600" : "text-gray-400 hover:text-gray-600"}`}
+              title="Advanced filters"
+            >
+              <Filter className="h-4 w-4" />
+            </button>
           </div>
+
+          {showAdvancedFilters && (
+            <div className="grid grid-cols-3 gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+              <div>
+                <label className="text-[10px] font-medium text-gray-500 mb-1 block">From</label>
+                <Input value={filterFrom} onChange={e => setFilterFrom(e.target.value)} placeholder="sender@example.com" className="h-8 text-xs" />
+              </div>
+              <div>
+                <label className="text-[10px] font-medium text-gray-500 mb-1 block">To</label>
+                <Input value={filterTo} onChange={e => setFilterTo(e.target.value)} placeholder="recipient@example.com" className="h-8 text-xs" />
+              </div>
+              <div>
+                <label className="text-[10px] font-medium text-gray-500 mb-1 block">Subject</label>
+                <Input value={filterSubject} onChange={e => setFilterSubject(e.target.value)} placeholder="subject word" className="h-8 text-xs" />
+              </div>
+              <div>
+                <label className="text-[10px] font-medium text-gray-500 mb-1 block">After</label>
+                <Input type="date" value={filterAfter} onChange={e => setFilterAfter(e.target.value)} className="h-8 text-xs" />
+              </div>
+              <div>
+                <label className="text-[10px] font-medium text-gray-500 mb-1 block">Before</label>
+                <Input type="date" value={filterBefore} onChange={e => setFilterBefore(e.target.value)} className="h-8 text-xs" />
+              </div>
+              <div>
+                <label className="text-[10px] font-medium text-gray-500 mb-1 block">Attachments</label>
+                <select
+                  value={filterHasAttachment === undefined ? "" : String(filterHasAttachment)}
+                  onChange={e => setFilterHasAttachment(e.target.value === "" ? undefined : e.target.value === "true")}
+                  className="h-8 text-xs w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-2"
+                >
+                  <option value="">Any</option>
+                  <option value="true">Has attachments</option>
+                  <option value="false">No attachments</option>
+                </select>
+              </div>
+              <div className="col-span-3 flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setFilterFrom(""); setFilterTo(""); setFilterSubject(""); setFilterHasAttachment(undefined); setFilterBefore(""); setFilterAfter(""); setShowAdvancedFilters(false) }}
+                  className="text-xs h-7"
+                >
+                  Clear filters
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -540,9 +725,10 @@ export default function DashboardPage() {
         <div className="flex flex-col w-full overflow-y-auto">
           <InboxList
             emails={displayEmails}
-            selectedId={undefined}
+            selectedId={selectedEmailId}
             selectedIds={selectedIds}
             onSelect={handleSelect}
+            onNavigate={handleNavigate}
             onStar={handleStar}
             onArchive={handleArchive}
             onDelete={handleDelete}
@@ -551,6 +737,10 @@ export default function DashboardPage() {
             threadCounts={threadCounts}
             loading={loading}
             currentFolder={currentFolder}
+            onPin={handlePin}
+            onSnooze={handleSnooze}
+            onAssignLabels={handleAssignLabels}
+            labels={[]}
           />
         </div>
       </div>
@@ -560,6 +750,7 @@ export default function DashboardPage() {
         onClose={() => setShowCompose(false)}
         onSend={handleSend}
         fromAddresses={fromAddresses}
+        workspaceId={workspaceId}
         key={showCompose ? "new" : "closed"}
       />
     </>

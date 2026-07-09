@@ -16,7 +16,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const { user, supabase } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const rl = checkRateLimit(`patch:${user.id}`, RATE_LIMITS.emails)
+    const rl = await checkRateLimit(`patch:${user.id}`, RATE_LIMITS.emails)
     if (!rl.allowed) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } })
     }
@@ -55,7 +55,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const { user, supabase } = auth
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const rl = checkRateLimit(`delete:${user.id}`, RATE_LIMITS.emails)
+    const rl = await checkRateLimit(`delete:${user.id}`, RATE_LIMITS.emails)
     if (!rl.allowed) {
       return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } })
     }

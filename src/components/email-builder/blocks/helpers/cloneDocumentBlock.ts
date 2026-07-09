@@ -19,14 +19,21 @@ function cloneBlock(document: TEditorConfiguration, blockId: string): TEditorBlo
   switch (clone.type) {
     case 'EmailLayout':
       throw new Error('Cloning EmailLayout blocks is not supported.')
+    case 'Accordion':
     case 'Avatar':
     case 'Button':
+    case 'ButtonGroup':
+    case 'CountdownTimer':
     case 'Divider':
+    case 'Header':
     case 'Heading':
     case 'Html':
     case 'Image':
+    case 'ProgressBar':
+    case 'SocialLinks':
     case 'Spacer':
     case 'Text':
+    case 'Video':
       return clone
     case 'Container':
       if (clone.data?.props?.childrenIds) {

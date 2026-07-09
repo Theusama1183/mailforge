@@ -1,6 +1,6 @@
 "use client"
 
-import { Reply, ReplyAll, Forward, Trash2, Archive, Star, ArrowLeft } from "lucide-react"
+import { Reply, ReplyAll, Forward, Trash2, Archive, Star, ArrowLeft, RefreshCw, Pin, BellOff, Tag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -12,7 +12,14 @@ interface EmailToolbarProps {
   onDelete: () => void
   onArchive: () => void
   onBack: () => void
+  onResend?: () => void
+  onPin?: () => void
+  onSnooze?: () => void
+  onLabel?: () => void
   isStarred: boolean
+  isPinned?: boolean
+  showResend?: boolean
+  showLabelPicker?: boolean
   className?: string
 }
 
@@ -28,7 +35,14 @@ export function EmailToolbar({
   onDelete,
   onArchive,
   onBack,
+  onResend,
+  onPin,
+  onSnooze,
+  onLabel,
   isStarred,
+  isPinned,
+  showResend,
+  showLabelPicker,
   className,
 }: EmailToolbarProps) {
   return (
@@ -89,7 +103,62 @@ export function EmailToolbar({
         </Button>
       </div>
 
+      {showResend && onResend && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onResend}
+          className="h-8 gap-1.5 text-orange-600 dark:text-orange-400 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-950 px-2.5"
+          aria-label="Resend email"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline text-xs font-medium">Resend</span>
+        </Button>
+      )}
       <div className="ml-auto flex items-center gap-0.5">
+        {onPin && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onPin}
+            className={cn(
+              "h-8 w-8",
+              isPinned
+                ? "text-amber-500 hover:text-amber-600"
+                : "text-gray-400 dark:text-gray-500 hover:text-amber-500"
+            )}
+            aria-label={isPinned ? "Unpin email" : "Pin email"}
+          >
+            <Pin className="h-4 w-4" fill={isPinned ? "currentColor" : "none"} />
+          </Button>
+        )}
+        {onSnooze && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onSnooze}
+            className="h-8 w-8 text-gray-400 dark:text-gray-500 hover:text-purple-500"
+            aria-label="Snooze email"
+          >
+            <BellOff className="h-4 w-4" />
+          </Button>
+        )}
+        {onLabel && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onLabel}
+            className={cn(
+              "h-8 w-8",
+              showLabelPicker
+                ? "text-blue-500"
+                : "text-gray-400 dark:text-gray-500 hover:text-blue-500"
+            )}
+            aria-label="Manage labels"
+          >
+            <Tag className="h-4 w-4" />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"

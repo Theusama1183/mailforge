@@ -47,6 +47,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       trash: "inbox?folder=trash",
       analytics: "analytics",
       templates: "templates",
+      contacts: "contacts",
+      "ab-tests": "ab-tests",
       "imap-sync": "imap-sync",
       workspaces: "workspaces",
       settings: "settings",
@@ -73,6 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           const wsId = currentWorkspaceId || activeWorkspaceId
           if (wsId) router.push(`/${wsId}/inbox?compose=1`)
         }}
+        workspaceId={currentWorkspaceId || activeWorkspaceId || undefined}
       />
       <main className="flex-1 flex flex-col min-w-0">
         {children}

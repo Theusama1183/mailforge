@@ -11,6 +11,7 @@ interface InboxListProps {
   selectedId?: string
   selectedIds?: Set<string>
   onSelect: (id: string) => void
+  onNavigate?: (id: string) => void
   onStar: (id: string, starred: boolean) => void
   onArchive: (id: string) => void
   onDelete: (id: string) => void
@@ -19,6 +20,10 @@ interface InboxListProps {
   threadCounts?: Record<string, number>
   loading?: boolean
   currentFolder?: string
+  onPin?: (id: string, pinned: boolean) => void
+  onSnooze?: (id: string, until: string | null) => void
+  onAssignLabels?: (emailId: string, labelIds: string[]) => void
+  labels?: { id: string; name: string; color: string }[]
 }
 
 const EMPTY_LIST_CONFIG: Record<string, { icon: React.ComponentType<{ className?: string }>; title: string; subtitle: string }> = {
@@ -36,6 +41,7 @@ export function InboxList({
   selectedId,
   selectedIds,
   onSelect,
+  onNavigate,
   onStar,
   onArchive,
   onDelete,
@@ -44,6 +50,8 @@ export function InboxList({
   threadCounts = {},
   loading = false,
   currentFolder = "inbox",
+  onPin,
+  onSnooze,
 }: InboxListProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const selectedRef = useRef<HTMLDivElement>(null)
@@ -72,9 +80,12 @@ export function InboxList({
       } else if (e.key === "End") {
         e.preventDefault()
         if (emails.length > 0) onSelect(emails[emails.length - 1].id)
+      } else if (e.key === "Enter" && selectedId) {
+        e.preventDefault()
+        onNavigate?.(selectedId)
       }
     },
-    [emails, selectedId, onSelect]
+    [emails, selectedId, onSelect, onNavigate]
   )
 
   if (loading) {
@@ -142,11 +153,14 @@ export function InboxList({
               isChecked={selectedIds?.has(email.id) ?? false}
               threadCount={threadCounts[email.id]}
               onSelect={onSelect}
+              onNavigate={onNavigate}
               onStar={onStar}
               onArchive={onArchive}
               onDelete={onDelete}
               onToggleRead={onToggleRead}
               onToggleCheck={onToggleSelection}
+              onPin={onPin}
+              onSnooze={onSnooze}
             />
           </div>
         )

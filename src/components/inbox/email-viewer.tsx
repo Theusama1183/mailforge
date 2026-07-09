@@ -51,6 +51,12 @@ export function EmailViewer({
   onArchive,
   onStar,
   onBack,
+  onResend,
+  onPin,
+  onSnooze,
+  onLabel,
+  labels,
+  showLabelPicker,
 }: {
   email: Email
   onReply?: () => void
@@ -60,6 +66,12 @@ export function EmailViewer({
   onArchive?: () => void
   onStar?: () => void
   onBack?: () => void
+  onResend?: () => void
+  onPin?: () => void
+  onSnooze?: () => void
+  onLabel?: () => void
+  labels?: { id: string; name: string; color: string }[]
+  showLabelPicker?: boolean
 }) {
   const sanitizedHtml = useMemo(() => {
     if (!email.body_html) return ""
@@ -79,13 +91,47 @@ export function EmailViewer({
         onDelete={onDelete || (() => {})}
         onArchive={onArchive || (() => {})}
         onBack={onBack || (() => {})}
+        onResend={onResend}
+        onPin={onPin}
+        onSnooze={onSnooze}
+        onLabel={onLabel}
         isStarred={email.starred || false}
+        isPinned={email.pinned || false}
+        showResend={email.direction === "outbound" && (email.delivery_status === "failed" || email.delivery_status === "bounced")}
+        showLabelPicker={showLabelPicker}
       />
 
       {/* Scrollable content area */}
       <div className="flex-1 overflow-y-auto">
         {/* Email header */}
         <EmailHeader email={email} />
+
+        {/* Labels */}
+        {labels && labels.length > 0 && (
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-3 flex items-center gap-1.5 flex-wrap">
+            {labels.map(label => (
+              <span
+                key={label.id}
+                className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium leading-none"
+                style={{ backgroundColor: label.color + "20", color: label.color }}
+              >
+                {label.name}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Label picker */}
+        {showLabelPicker && onLabel && (
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-2">
+            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <p className="text-xs font-medium text-gray-500 mb-2">Assign labels</p>
+              <div className="flex flex-wrap gap-1.5">
+                {/* Labels rendered by parent via label picker overlay */}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Email body with max-width constraint */}
         {sanitizedHtml ? (

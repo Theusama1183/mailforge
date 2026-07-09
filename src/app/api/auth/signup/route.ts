@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     }
 
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
-    const rl = checkRateLimit(`signup:${ip}`, { interval: 60_000, maxRequests: 3 })
+    const rl = await checkRateLimit(`signup:${ip}`, { interval: 60_000, maxRequests: 3 })
     if (!rl.allowed) {
       return NextResponse.json({ error: "Too many signup attempts. Please wait." }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } })
     }

@@ -1,10 +1,10 @@
 import React from 'react'
 
-import { ArrowDownwardOutlined, ArrowUpwardOutlined, ContentCopyOutlined, DeleteOutlined } from '@mui/icons-material'
+import { ArrowDownwardOutlined, ArrowUpwardOutlined, ContentCopyOutlined, DeleteOutlined, LockOutlined, LockOpenOutlined } from '@mui/icons-material'
 import { IconButton, Paper, Stack, SxProps, Tooltip } from '@mui/material'
 
 import { TEditorBlock, TEditorConfiguration } from '../../../editor/core'
-import { resetDocument, setSelectedBlockId, useDocument } from '../../../editor/EditorContext'
+import { resetDocument, setDocument, setSelectedBlockId, useDocument } from '../../../editor/EditorContext'
 import { ColumnsContainerProps } from '../../ColumnsContainer/ColumnsContainerPropsSchema'
 import cloneDocumentBlock from '../cloneDocumentBlock'
 
@@ -226,6 +226,26 @@ export default function TuneMenu({ blockId }: Props) {
     setSelectedBlockId(blockId)
   }
 
+  const handleToggleLock = () => {
+    const block = document[blockId]
+    const currentlyLocked = block?.data?.props?._locked || block?.data?._locked
+    setDocument({
+      [blockId]: {
+        ...block,
+        data: {
+          ...block.data,
+          props: {
+            ...(block.data?.props || {}),
+            _locked: !currentlyLocked,
+          },
+        },
+      } as TEditorBlock,
+    })
+  }
+
+  const blockData = document[blockId]
+  const isLocked = blockData?.data?.props?._locked || blockData?.data?._locked
+
   return (
     <Paper sx={sx} onClick={(ev) => ev.stopPropagation()}>
       <Stack>
@@ -247,6 +267,11 @@ export default function TuneMenu({ blockId }: Props) {
         <Tooltip title="Delete" placement="left-start">
           <IconButton onClick={handleDeleteClick} sx={{ color: 'text.primary' }}>
             <DeleteOutlined fontSize="small" />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title={isLocked ? 'Unlock' : 'Lock'} placement="left-start">
+          <IconButton onClick={handleToggleLock} sx={{ color: isLocked ? '#F59E0B' : 'text.primary' }}>
+            {isLocked ? <LockOutlined fontSize="small" /> : <LockOpenOutlined fontSize="small" />}
           </IconButton>
         </Tooltip>
       </Stack>

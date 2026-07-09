@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS public.templates (
 
 ALTER TABLE public.templates ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage own templates" ON public.templates;
 CREATE POLICY "Users can manage own templates"
   ON public.templates
   FOR ALL

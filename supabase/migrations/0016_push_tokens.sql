@@ -13,5 +13,6 @@ CREATE INDEX IF NOT EXISTS idx_push_tokens_user_id ON public.push_tokens(user_id
 
 ALTER TABLE public.push_tokens ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage their own push tokens" ON public.push_tokens;
 CREATE POLICY "Users can manage their own push tokens" ON public.push_tokens
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);

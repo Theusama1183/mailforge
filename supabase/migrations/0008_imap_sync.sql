@@ -23,9 +23,11 @@ CREATE TABLE IF NOT EXISTS public.imap_sync_state (
 ALTER TABLE public.imap_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.imap_sync_state ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage own imap accounts" ON public.imap_accounts;
 CREATE POLICY "Users can manage own imap accounts"
   ON public.imap_accounts FOR ALL USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can manage own imap sync state" ON public.imap_sync_state;
 CREATE POLICY "Users can manage own imap sync state"
   ON public.imap_sync_state
   FOR ALL

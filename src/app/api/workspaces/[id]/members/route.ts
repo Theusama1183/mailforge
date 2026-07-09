@@ -162,18 +162,21 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       return NextResponse.json({ error: "Only admins can assign emails" }, { status: 403 })
     }
 
-    // First unassign all emails from this user in this workspace
+    // Snapshot current assignments for rollback
     const { data: wsEmails } = await admin
       .from("email_addresses")
       .select("id")
       .eq("workspace_id", id)
       .eq("assigned_to", userId)
 
-    if (wsEmails && wsEmails.length > 0) {
+    const previouslyAssigned = wsEmails?.map(e => e.id) || []
+
+    // Unassign all emails from this user in this workspace
+    if (previouslyAssigned.length > 0) {
       await admin
         .from("email_addresses")
         .update({ assigned_to: null })
-        .in("id", wsEmails.map(e => e.id))
+        .in("id", previouslyAssigned)
     }
 
     // Assign the selected emails
@@ -185,6 +188,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         .eq("workspace_id", id)
 
       if (assignError) {
+        // Rollback: restore previous assignments
+        if (previouslyAssigned.length > 0) {
+          await admin
+            .from("email_addresses")
+            .update({ assigned_to: userId })
+            .in("id", previouslyAssigned)
+        }
         return NextResponse.json({ error: assignError.message }, { status: 500 })
       }
     }

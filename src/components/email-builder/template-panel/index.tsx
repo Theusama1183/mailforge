@@ -10,6 +10,7 @@ import {
   useDocument,
   useSelectedMainTab,
   useSelectedScreenSize,
+  useZoom,
 } from '../editor/EditorContext'
 import ToggleInspectorPanelButton from '../inspector/ToggleInspectorPanelButton'
 import ToggleSamplesPanelButton from '../samples/ToggleSamplesPanelButton'
@@ -22,9 +23,14 @@ export default function TemplatePanel() {
   const document = useDocument()
   const selectedMainTab = useSelectedMainTab()
   const selectedScreenSize = useSelectedScreenSize()
+  const zoom = useZoom()
+
+  const zoomPercent = zoom / 100
 
   let mainBoxSx: SxProps = {
     height: '100%',
+    transform: `scale(${zoomPercent})`,
+    transformOrigin: 'top center',
   }
   if (selectedScreenSize === 'mobile') {
     mainBoxSx = {
@@ -111,7 +117,18 @@ export default function TemplatePanel() {
         </Stack>
         <ToggleInspectorPanelButton />
       </Stack>
-      <Box sx={{ height: 'calc(100vh - 49px)', overflow: 'auto', minWidth: 370 }}>{renderMainPanel()}</Box>
+      <Box
+        sx={{
+          height: 'calc(100vh - 49px)',
+          overflow: 'auto',
+          minWidth: 370,
+          display: 'flex',
+          justifyContent: 'center',
+          bgcolor: '#e8e8e8',
+        }}
+      >
+        {renderMainPanel()}
+      </Box>
     </>
   )
 }

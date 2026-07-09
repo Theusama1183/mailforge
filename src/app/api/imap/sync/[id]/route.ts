@@ -1,30 +1,29 @@
 import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/supabase/api-client"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { syncMailbox, listMailboxes, mapFolder, DEFAULT_MAILBOXES } from "@/lib/imap"
-import CryptoJS from "crypto-js"
+import { testImapConnection, listMailboxes, syncMailbox } from "@/lib/imap"
+import crypto from "crypto"
 
-function getEncryptionKey(): string {
-  const key = process.env.IMAP_ENCRYPTION_KEY
-  if (!key) {
-    throw new Error("IMAP_ENCRYPTION_KEY environment variable is required for IMAP account encryption")
-  }
-  return key
-}
-
-function decrypt(encrypted: string): string {
-  return CryptoJS.AES.decrypt(encrypted, getEncryptionKey()).toString(CryptoJS.enc.Utf8)
+const DEFAULT_FOLDER_MAP: Record<string, string> = {
+  "INBOX": "inbox",
+  "SENT": "sent",
+  "DRAFTS": "drafts",
+  "TRASH": "trash",
+  "SPAM": "spam",
+  "[Gmail]/Sent Mail": "sent",
+  "[Gmail]/Drafts": "drafts",
+  "[Gmail]/Trash": "trash",
+  "[Gmail]/Spam": "spam",
+  "[Gmail]/Starred": "starred",
+  "[Gmail]/All Mail": "archive",
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const auth = await getAuthUser(req)
-
-    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-    const { user, supabase  } = auth
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { user, supabase } = auth
 
     const { data: account } = await supabase
       .from("imap_accounts")
@@ -33,78 +32,105 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .eq("user_id", user.id)
       .single()
 
-    if (!account) return NextResponse.json({ error: "IMAP account not found" }, { status: 404 })
+    if (!account) return NextResponse.json({ error: "Account not found" }, { status: 404 })
+
+    // Decrypt password
+    let password = ""
+    try {
+      const key = process.env.IMAP_ENCRYPTION_KEY || "default-dev-key-change-in-production"
+      const parts = account.password_encrypted.split(":")
+      const decipher = crypto.createDecipheriv("aes-256-cbc", key.padEnd(32, "0").slice(0, 32), key.padEnd(16, "0").slice(0, 16))
+      password = decipher.update(parts[0], "hex", "utf8") + decipher.final("utf8")
+    } catch {
+      return NextResponse.json({ error: "Failed to decrypt password" }, { status: 500 })
+    }
+
+    // Create sync log
+    const admin = createAdminClient()
+    const { data: log } = await admin.from("imap_sync_logs").insert({
+      account_id: id,
+      status: "running",
+    }).select().single()
 
     const config = {
       host: account.host,
       port: account.port,
       username: account.username,
-      password: decrypt(account.password_encrypted),
+      password,
       useTls: account.use_tls,
     }
 
-    const mailboxes = await listMailboxes(config)
-    const adminDb = createAdminClient()
-    let totalSynced = 0
+    try {
+      // Test connection
+      const testResult = await testImapConnection(config)
+      if (!testResult.ok) throw new Error(testResult.error || "Connection failed")
 
-    for (const mb of mailboxes) {
-      const folder = mapFolder(mb.path)
-      if (!DEFAULT_MAILBOXES.includes(folder) && !folder.startsWith("INBOX")) continue
+      // List mailboxes
+      const mailboxes = await listMailboxes(config)
 
-      const { data: syncState } = await adminDb
-        .from("imap_sync_state")
-        .select("last_uid")
+      // Get user's folder mappings
+      const { data: mappings } = await supabase
+        .from("imap_folder_mappings")
+        .select("*")
         .eq("account_id", id)
-        .eq("mailbox_name", mb.path)
-        .maybeSingle()
+        .eq("enabled", true)
 
-      const sinceUid = syncState?.last_uid || 0
-      const result = await syncMailbox(config, mb.path, sinceUid)
-
-      if (result.messages.length === 0) continue
-
-      const direction = folder === "SENT" ? "outbound" : "inbound"
-      const emailRows = result.messages.map(msg => ({
-        user_id: user.id,
-        mailbox_address: account.username,
-        from_address: msg.from,
-        to_addresses: msg.to ? msg.to.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
-        cc_addresses: msg.cc ? msg.cc.split(",").map((s: string) => s.trim()).filter(Boolean) : [],
-        subject: msg.subject,
-        body_html: msg.bodyHtml || null,
-        body_text: msg.bodyText || null,
-        direction,
-        folder: folder.toLowerCase(),
-        message_id: msg.messageId || null,
-        in_reply_to: msg.inReplyTo || null,
-        references: msg.references ? (Array.isArray(msg.references) ? msg.references : msg.references.split(/\s+/).filter(Boolean)) : [],
-        created_at: msg.date || new Date().toISOString(),
-      }))
-
-      const { error: insertError } = await adminDb.from("emails").insert(emailRows)
-      if (insertError) {
-        console.error(`Failed to insert emails for ${mb.path}:`, insertError)
-        continue
+      const mapLookup: Record<string, string> = {}
+      if (mappings?.length) {
+        for (const m of mappings) {
+          mapLookup[m.remote_folder] = m.local_folder
+        }
       }
 
-      await adminDb.from("imap_sync_state").upsert({
-        account_id: id,
-        mailbox_name: mb.path,
-        last_uid: result.highestUid,
-        last_sync_at: new Date().toISOString(),
-      }, { onConflict: "account_id,mailbox_name" })
+      let totalSynced = 0
+      for (const mailbox of mailboxes) {
+        const mailboxName = typeof mailbox === "string" ? mailbox : mailbox.path
+        const localFolder = mapLookup[mailboxName] || DEFAULT_FOLDER_MAP[mailboxName]
+        if (!localFolder) continue
 
-      totalSynced += result.messages.length
+        const { data: state } = await supabase
+          .from("imap_sync_state")
+          .select("last_uid")
+          .eq("account_id", id)
+          .eq("mailbox_name", mailboxName)
+          .maybeSingle()
+
+        const sinceUid = state?.last_uid || 1
+        const result = await syncMailbox(config, mailboxName, sinceUid)
+
+        if (result.messages.length > 0) {
+          if (result.highestUid > (state?.last_uid || 0)) {
+            await supabase.from("imap_sync_state").upsert({
+              account_id: id,
+              mailbox_name: mailboxName,
+              last_uid: result.highestUid,
+              last_sync_at: new Date().toISOString(),
+            }, { onConflict: "account_id, mailbox_name" })
+          }
+          totalSynced += result.messages.length
+        }
+      }
+
+      await admin.from("imap_sync_logs").update({
+        status: "completed",
+        messages_synced: totalSynced,
+        completed_at: new Date().toISOString(),
+      }).eq("id", log!.id)
+
+      return NextResponse.json({ synced: totalSynced })
+    } catch (err) {
+      await admin.from("imap_sync_logs").update({
+        status: "failed",
+        error_message: err instanceof Error ? err.message : "Unknown error",
+        completed_at: new Date().toISOString(),
+      }).eq("id", log!.id)
+
+      return NextResponse.json({
+        error: err instanceof Error ? err.message : "Sync failed",
+        synced: 0,
+      })
     }
-
-    await supabase.from("imap_accounts").update({ updated_at: new Date().toISOString() }).eq("id", id)
-
-    return NextResponse.json({ success: true, synced: totalSynced })
   } catch (error) {
-    console.error("IMAP sync error:", error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Sync failed" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Failed to sync" }, { status: 500 })
   }
 }

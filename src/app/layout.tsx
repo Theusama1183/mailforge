@@ -4,6 +4,7 @@ import "./globals.css"
 import { Toaster } from "sonner"
 import { ThemeProvider } from "@/components/theme-provider"
 import { WorkspaceProvider } from "@/components/workspace-provider"
+import { CookieConsentBanner } from "@/components/cookie-consent-banner"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -29,6 +30,7 @@ export default function RootLayout({
               Skip to content
             </a>
             {children}
+            <CookieConsentBanner />
           </WorkspaceProvider>
         </ThemeProvider>
         <Toaster position="top-right" richColors />

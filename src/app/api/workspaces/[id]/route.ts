@@ -99,7 +99,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
     const { data: workspace } = await admin
       .from("workspaces")
-      .select("created_by")
+      .select("created_by, name")
       .eq("id", id)
       .single()
 
@@ -108,6 +108,33 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const isCreator = workspace.created_by === user.id
     const isAdmin = await isWorkspaceAdmin(admin, id, user.id)
     if (!isCreator && !isAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
+    const url = new URL(req.url)
+    const exportData = url.searchParams.get("export") === "true"
+
+    if (exportData) {
+      // Collect data for export
+      const [emails, members, domains, campaigns, abTests] = await Promise.all([
+        admin.from("email_addresses").select("*").eq("workspace_id", id),
+        admin.from("workspace_members").select("*, users!inner(email)").eq("workspace_id", id),
+        admin.from("email_domains").select("*").eq("workspace_id", id),
+        admin.from("campaigns").select("*").eq("workspace_id", id),
+        admin.from("ab_tests").select("*").eq("workspace_id", id),
+      ])
+
+      const data = {
+        workspace: { name: workspace.name, id },
+        exportedAt: new Date().toISOString(),
+        emails: emails.data || [],
+        members: members.data || [],
+        domains: domains.data || [],
+        campaigns: campaigns.data || [],
+        abTests: abTests.data || [],
+      }
+
+      // Store export in a new table or return as JSON
+      return NextResponse.json(data)
+    }
 
     const { error } = await admin.from("workspaces").delete().eq("id", id)
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })

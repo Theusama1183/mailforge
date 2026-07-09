@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     }
 
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
-    const rl = checkRateLimit(`verify-otp:${email}:${ip}`, RATE_LIMITS.auth)
+    const rl = await checkRateLimit(`verify-otp:${email}:${ip}`, RATE_LIMITS.auth)
     if (!rl.allowed) {
       return NextResponse.json({ error: "Too many attempts. Please wait." }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } })
     }
@@ -37,7 +37,10 @@ export async function POST(req: Request) {
       .order("created_at", { ascending: false })
       .limit(5)
 
-    if (fetchError || !records || records.length === 0) {
+    if (fetchError) {
+      return NextResponse.json({ error: fetchError.message }, { status: 500 })
+    }
+    if (!records || records.length === 0) {
       return NextResponse.json({ error: "No valid OTP found. Request a new one." }, { status: 400 })
     }
 

@@ -41,7 +41,7 @@ function getTransporter() {
 export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
   const transporter = getTransporter()
   if (!transporter) {
-    console.warn("Email not sent to", options.to, "- configure SMTP_HOST/SMTP_USER/SMTP_PASS or MAILGUN_API_KEY")
+    console.warn("Email not sent - configure SMTP_HOST/SMTP_USER/SMTP_PASS or MAILGUN_API_KEY")
     return false
   }
 
@@ -53,7 +53,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<boolean> {
       html: options.html,
       text: options.text || "",
     })
-    console.log("Email sent to", options.to)
+    console.log("Email sent successfully")
     return true
   } catch (err) {
     console.error("Failed to send email:", err)

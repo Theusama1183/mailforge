@@ -33,6 +33,7 @@ GRANT ALL ON public.auth_otps TO service_role;
 -- Previously only the creator could update/delete
 DROP POLICY IF EXISTS "Workspace creators can update" ON public.workspaces;
 DROP POLICY IF EXISTS "Workspace creators can delete" ON public.workspaces;
+DROP POLICY IF EXISTS "Admins can update workspace" ON public.workspaces;
 
 CREATE POLICY "Admins can update workspace"
   ON public.workspaces FOR UPDATE
@@ -41,6 +42,7 @@ CREATE POLICY "Admins can update workspace"
     OR public.is_workspace_admin(id)
   );
 
+DROP POLICY IF EXISTS "Admins can delete workspace" ON public.workspaces;
 CREATE POLICY "Admins can delete workspace"
   ON public.workspaces FOR DELETE
   USING (

@@ -4,6 +4,8 @@ import { z } from 'zod'
 import { Avatar, AvatarPropsSchema } from '@usewaypoint/block-avatar'
 import { Button, ButtonPropsSchema } from '@usewaypoint/block-button'
 import { Divider, DividerPropsSchema } from '@usewaypoint/block-divider'
+import HeaderEditor from '../blocks/Header/HeaderEditor'
+import HeaderPropsSchema from '../blocks/Header/HeaderPropsSchema'
 import HeadingBlockEditor from '../blocks/Heading/HeadingBlockEditor'
 import HeadingBlockPropsSchema from '../blocks/Heading/HeadingBlockPropsSchema'
 import { Html, HtmlPropsSchema } from '@usewaypoint/block-html'
@@ -35,6 +37,22 @@ import SocialLinksEditor from '../blocks/SocialLinks/SocialLinksEditor'
 import SocialLinksPropsSchema from '../blocks/SocialLinks/SocialLinksPropsSchema'
 import VideoEditor from '../blocks/Video/VideoEditor'
 import VideoPropsSchema from '../blocks/Video/VideoPropsSchema'
+import FooterEditor from '../blocks/Footer/FooterEditor'
+import FooterPropsSchema from '../blocks/Footer/FooterPropsSchema'
+import MenuNavEditor from '../blocks/MenuNav/MenuNavEditor'
+import MenuNavPropsSchema from '../blocks/MenuNav/MenuNavPropsSchema'
+import MapEditor from '../blocks/Map/MapEditor'
+import MapPropsSchema from '../blocks/Map/MapPropsSchema'
+import CouponEditor from '../blocks/Coupon/CouponEditor'
+import CouponPropsSchema from '../blocks/Coupon/CouponPropsSchema'
+import ProductGridEditor from '../blocks/ProductGrid/ProductGridEditor'
+import ProductGridPropsSchema from '../blocks/ProductGrid/ProductGridPropsSchema'
+import TestimonialEditor from '../blocks/Testimonial/TestimonialEditor'
+import TestimonialPropsSchema from '../blocks/Testimonial/TestimonialPropsSchema'
+import PricingTableEditor from '../blocks/PricingTable/PricingTableEditor'
+import PricingTablePropsSchema from '../blocks/PricingTable/PricingTablePropsSchema'
+import CalendarEventEditor from '../blocks/CalendarEvent/CalendarEventEditor'
+import CalendarEventPropsSchema from '../blocks/CalendarEvent/CalendarEventPropsSchema'
 
 const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
   Avatar: {
@@ -58,6 +76,14 @@ const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
     Component: (props) => (
       <EditorBlockWrapper>
         <ButtonGroupEditor {...props} />
+      </EditorBlockWrapper>
+    ),
+  },
+  Header: {
+    schema: HeaderPropsSchema,
+    Component: (props) => (
+      <EditorBlockWrapper>
+        <HeaderEditor {...props} />
       </EditorBlockWrapper>
     ),
   },
@@ -175,6 +201,70 @@ const EDITOR_DICTIONARY = buildBlockConfigurationDictionary({
     Component: (props) => (
       <EditorBlockWrapper>
         <Divider {...props} />
+      </EditorBlockWrapper>
+    ),
+  },
+  Footer: {
+    schema: FooterPropsSchema,
+    Component: (props) => (
+      <EditorBlockWrapper>
+        <FooterEditor {...props} />
+      </EditorBlockWrapper>
+    ),
+  },
+  MenuNav: {
+    schema: MenuNavPropsSchema,
+    Component: (props) => (
+      <EditorBlockWrapper>
+        <MenuNavEditor {...props} />
+      </EditorBlockWrapper>
+    ),
+  },
+  Map: {
+    schema: MapPropsSchema,
+    Component: (props) => (
+      <EditorBlockWrapper>
+        <MapEditor {...props} />
+      </EditorBlockWrapper>
+    ),
+  },
+  Coupon: {
+    schema: CouponPropsSchema,
+    Component: (props) => (
+      <EditorBlockWrapper>
+        <CouponEditor {...props} />
+      </EditorBlockWrapper>
+    ),
+  },
+  ProductGrid: {
+    schema: ProductGridPropsSchema,
+    Component: (props) => (
+      <EditorBlockWrapper>
+        <ProductGridEditor {...props} />
+      </EditorBlockWrapper>
+    ),
+  },
+  Testimonial: {
+    schema: TestimonialPropsSchema,
+    Component: (props) => (
+      <EditorBlockWrapper>
+        <TestimonialEditor {...props} />
+      </EditorBlockWrapper>
+    ),
+  },
+  PricingTable: {
+    schema: PricingTablePropsSchema,
+    Component: (props) => (
+      <EditorBlockWrapper>
+        <PricingTableEditor {...props} />
+      </EditorBlockWrapper>
+    ),
+  },
+  CalendarEvent: {
+    schema: CalendarEventPropsSchema,
+    Component: (props) => (
+      <EditorBlockWrapper>
+        <CalendarEventEditor {...props} />
       </EditorBlockWrapper>
     ),
   },

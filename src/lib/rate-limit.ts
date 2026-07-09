@@ -1,45 +1,60 @@
+import { createAdminClient } from "@/lib/supabase/admin"
+
 export interface RateLimitConfig {
   interval: number
   maxRequests: number
 }
 
-const stores = new Map<string, { timestamps: number[] }>()
-
-function getStore(key: string) {
-  let store = stores.get(key)
-  if (!store) {
-    store = { timestamps: [] }
-    stores.set(key, store)
-  }
-  return store
+async function getDbStore() {
+  return createAdminClient()
 }
 
-function cleanup() {
-  const now = Date.now()
-  for (const [key, store] of stores) {
-    store.timestamps = store.timestamps.filter((t) => now - t < 60_000)
-    if (store.timestamps.length === 0) stores.delete(key)
-  }
-}
-
-setInterval(cleanup, 60_000)
-
-export function checkRateLimit(
+export async function checkRateLimit(
   key: string,
   config: RateLimitConfig
-): { allowed: boolean; retryAfter: number } {
+): Promise<{ allowed: boolean; retryAfter: number }> {
   const now = Date.now()
-  const store = getStore(key)
-  store.timestamps = store.timestamps.filter((t) => now - t < config.interval)
+  const windowStart = new Date(now - config.interval).toISOString()
 
-  if (store.timestamps.length >= config.maxRequests) {
-    const oldest = store.timestamps[0]
-    const retryAfter = Math.ceil((oldest + config.interval - now) / 1000)
-    return { allowed: false, retryAfter }
+  try {
+    const supabase = await getDbStore()
+
+    const { count, error } = await supabase
+      .from("rate_limits")
+      .select("id", { count: "exact", head: true })
+      .eq("key", key)
+      .gte("created_at", windowStart)
+
+    if (error) {
+      return { allowed: true, retryAfter: 0 }
+    }
+
+    if (count !== null && count >= config.maxRequests) {
+      const { data: oldest } = await supabase
+        .from("rate_limits")
+        .select("created_at")
+        .eq("key", key)
+        .gte("created_at", windowStart)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .single()
+
+      if (oldest) {
+        const retryAfter = Math.ceil((new Date(oldest.created_at).getTime() + config.interval - now) / 1000)
+        return { allowed: false, retryAfter: Math.max(1, retryAfter) }
+      }
+      return { allowed: false, retryAfter: Math.ceil(config.interval / 1000) }
+    }
+
+    await supabase.from("rate_limits").insert({
+      key,
+      created_at: new Date().toISOString(),
+    })
+
+    return { allowed: true, retryAfter: 0 }
+  } catch {
+    return { allowed: true, retryAfter: 0 }
   }
-
-  store.timestamps.push(now)
-  return { allowed: true, retryAfter: 0 }
 }
 
 export const RATE_LIMITS = {

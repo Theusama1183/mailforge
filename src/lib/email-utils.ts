@@ -18,23 +18,30 @@ export function decodeMimeSubject(subject: string | null | undefined): string {
     (_match, charset: string, encoding: string, text: string) => {
       try {
         if (encoding.toLowerCase() === "q") {
-          // Quoted-printable: =HH represents a byte, _ represents space
-          const decoded = text
-            .replace(/_/g, " ")
-            .replace(/=([0-9A-Fa-f]{2})/g, (_m: string, hex: string) =>
-              String.fromCharCode(parseInt(hex, 16))
-            )
-          // Try UTF-8 decode if the raw bytes are multi-byte
+          // Quoted-printable: =HH represents a raw byte, _ represents space
+          const bytes: number[] = []
+          let i = 0
+          while (i < text.length) {
+            if (text[i] === "_") {
+              bytes.push(0x20)
+              i++
+            } else if (text[i] === "=" && i + 2 < text.length) {
+              const hex = text.slice(i + 1, i + 3)
+              bytes.push(parseInt(hex, 16))
+              i += 3
+            } else {
+              bytes.push(text.charCodeAt(i))
+              i++
+            }
+          }
           try {
-            const bytes = new TextEncoder().encode(decoded)
-            return new TextDecoder(charset || "utf-8").decode(bytes)
+            return new TextDecoder(charset || "utf-8").decode(new Uint8Array(bytes))
           } catch {
-            return decoded
+            return String.fromCharCode(...bytes)
           }
         } else {
           // Base64
-          const binaryStr = atob(text)
-          const bytes = Uint8Array.from(binaryStr, (c) => c.charCodeAt(0))
+          const bytes = Buffer.from(text, "base64")
           return new TextDecoder(charset || "utf-8").decode(bytes)
         }
       } catch {
@@ -192,6 +199,8 @@ function encodeHtml(str: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;")
+    .replace(/`/g, "&#96;")
+    .replace(/\//g, "&#47;")
 }
 
 /**

@@ -166,12 +166,48 @@ export default function WorkspacesPage() {
   }
 
   async function deleteWorkspace(id: string) {
+    const confirmed = confirm("Delete this workspace? All data will be permanently removed.")
+    if (!confirmed) return
+    try {
+      // Export data before deletion
+      const exportRes = await fetch(`/api/workspaces/${id}?export=true`)
+      if (exportRes.ok) {
+        const data = await exportRes.json()
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `${data.workspace.name || "workspace"}-export-${new Date().toISOString().split("T")[0]}.json`
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+    } catch {} // export is best-effort
+
     try {
       const res = await fetch(`/api/workspaces/${id}`, { method: "DELETE" })
       if (!res.ok) throw new Error("Failed to delete")
       if (selected?.id === id) setSelected(null)
-      toast.success("Workspace deleted")
+      toast.success("Workspace deleted (data exported)")
       loadWorkspaces()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed")
+    }
+  }
+
+  async function transferOwnership(memberUserId: string) {
+    if (!selected) return
+    const confirmed = confirm(`Transfer ownership to this member? You will become an admin.`)
+    if (!confirmed) return
+    try {
+      const res = await fetch(`/api/workspaces/${selected.id}/transfer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newOwnerId: memberUserId }),
+      })
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || "Failed") }
+      toast.success("Ownership transferred")
+      loadWorkspaces()
+      if (selected) { selectWorkspace(selected) }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed")
     }
@@ -472,9 +508,14 @@ export default function WorkspacesPage() {
                                     </Button>
                                   )}
                                   {selected.role === "admin" && m.role !== "admin" && (
-                                    <Button variant="ghost" size="sm" onClick={() => removeMember(m.id)}>
-                                      <UserMinus className="h-4 w-4 text-red-500" />
-                                    </Button>
+                                    <>
+                                      <Button variant="ghost" size="sm" onClick={() => transferOwnership(m.user_id)} title="Transfer ownership">
+                                        <UserPlus className="h-4 w-4 text-blue-500" />
+                                      </Button>
+                                      <Button variant="ghost" size="sm" onClick={() => removeMember(m.id)}>
+                                        <UserMinus className="h-4 w-4 text-red-500" />
+                                      </Button>
+                                    </>
                                   )}
                                 </div>
                               </div>

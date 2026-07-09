@@ -17,7 +17,7 @@ CREATE INDEX IF NOT EXISTS idx_auth_otps_email ON public.auth_otps(email);
 -- Enable RLS (but allow insert/select by authenticated users via API)
 ALTER TABLE public.auth_otps ENABLE ROW LEVEL SECURITY;
 
--- Only allow inserts via service role (API)
+DROP POLICY IF EXISTS "Service role can manage OTPs" ON public.auth_otps;
 CREATE POLICY "Service role can manage OTPs" ON public.auth_otps
   FOR ALL USING (true) WITH CHECK (true);
 

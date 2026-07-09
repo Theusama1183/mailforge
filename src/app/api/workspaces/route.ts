@@ -60,8 +60,7 @@ export async function POST(req: Request) {
 
     if (memberError) {
       console.error("Member creation error:", memberError)
-      // Workspace was created but member insert failed — try to clean up
-      await admin.from("workspaces").delete().eq("id", workspace.id).maybeSingle()
+      await admin.from("workspaces").delete().eq("id", workspace.id)
       return NextResponse.json({ error: memberError.message }, { status: 500 })
     }
 

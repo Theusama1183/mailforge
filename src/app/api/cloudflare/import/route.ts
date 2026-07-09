@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server"
+import { getAuthUser } from "@/lib/supabase/api-client"
 
 export async function POST(req: Request) {
   try {
+    const auth = await getAuthUser(req)
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { user } = auth
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
     const { token } = await req.json()
     if (!token) {
       return NextResponse.json({ error: "Cloudflare API token required" }, { status: 400 })

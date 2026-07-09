@@ -14,6 +14,14 @@ export default function AuthCallbackPage() {
     const handleAuth = async () => {
       const { data } = await supabase.auth.getSession()
       if (data.session) {
+        fetch("/api/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: crypto.randomUUID(),
+            deviceType: /mobile|tablet/i.test(navigator.userAgent) ? "mobile" : "desktop",
+          }),
+        }).catch(() => {})
         router.push("/inbox")
       } else {
         router.push("/login")

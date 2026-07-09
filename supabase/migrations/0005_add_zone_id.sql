@@ -1,2 +1,2 @@
 ALTER TABLE domains
-ADD COLUMN zone_id TEXT;
+ADD COLUMN IF NOT EXISTS zone_id TEXT;

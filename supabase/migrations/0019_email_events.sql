@@ -15,7 +15,7 @@ CREATE INDEX IF NOT EXISTS idx_email_events_created ON public.email_events(creat
 
 ALTER TABLE public.email_events ENABLE ROW LEVEL SECURITY;
 
--- Users can view events for their own emails
+DROP POLICY IF EXISTS "Users can view events for own emails" ON public.email_events;
 CREATE POLICY "Users can view events for own emails"
   ON public.email_events FOR SELECT
   USING (
@@ -24,7 +24,7 @@ CREATE POLICY "Users can view events for own emails"
     )
   );
 
--- Allow insert via service role for tracking (anon/authenticated via API)
+DROP POLICY IF EXISTS "Anyone can insert events" ON public.email_events;
 CREATE POLICY "Anyone can insert events"
   ON public.email_events FOR INSERT
   WITH CHECK (true);
