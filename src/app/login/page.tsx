@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { LogIn, Mail, Lock, Eye, EyeOff, ExternalLink, Building2, Loader2 } from "lucide-react"
+import { LogIn, Mail, Lock, Eye, EyeOff, ExternalLink } from "lucide-react"
 
 function recordSession() {
   fetch("/api/sessions", {
@@ -247,22 +247,7 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {mode === "login" && (
-          <>
-            <div className="relative my-4 w-full">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-white/80 px-2 text-gray-400">Enterprise</span>
-              </div>
-            </div>
-
-            <SSOSignIn />
-          </>
-        )}
-
-        <div className="mt-5 text-center">
+        <div className="mt-6 text-center">
           <button
             onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(null) }}
             className="text-sm text-blue-600 hover:text-blue-700 font-medium"
@@ -273,48 +258,6 @@ export default function LoginPage() {
           </button>
         </div>
       </div>
-    </div>
-  )
-}
-
-function SSOSignIn() {
-  const [ssoDomain, setSsoDomain] = useState("")
-  const [ssoLoading, setSsoLoading] = useState(false)
-  const [ssoError, setSsoError] = useState<string | null>(null)
-  const supabase = createClient()
-
-  return (
-    <div className="w-full flex flex-col gap-2">
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            value={ssoDomain}
-            onChange={e => setSsoDomain(e.target.value)}
-            placeholder="your-company.com"
-            className="w-full pl-10 pr-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-gray-50/50 text-sm text-gray-900 placeholder:text-gray-400"
-          />
-        </div>
-        <button
-          type="button"
-          disabled={ssoLoading || !ssoDomain.trim()}
-          onClick={async () => {
-            setSsoLoading(true)
-            setSsoError(null)
-            const { error } = await supabase.auth.signInWithSSO({ domain: ssoDomain.trim() })
-            if (error) setSsoError(error.message)
-            setSsoLoading(false)
-          }}
-          className="px-4 py-2 rounded-xl bg-gray-800 text-white text-sm font-medium hover:brightness-110 disabled:opacity-50 transition-all"
-        >
-          {ssoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
-        </button>
-      </div>
-      {ssoError && (
-        <p className="text-xs text-red-500">{ssoError}</p>
-      )}
-      <p className="text-xs text-gray-400">Sign in with your company SSO provider</p>
     </div>
   )
 }

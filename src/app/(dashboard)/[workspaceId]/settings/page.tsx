@@ -10,7 +10,7 @@ import { PageHeader } from "@/components/page-header"
 import {
   Plus, Trash2, Globe, Mail, Loader2, Server, Settings2, RefreshCw, Cloud,
   CheckCircle, XCircle, LogIn, ArrowUpDown, PenLine, Check,
-  User, Bell, Plane, Forward, Ban, Users, MailCheck, Lock, Key, Smartphone, Shield, ShieldOff, Network, Fingerprint, Building2,
+  User, Bell, Plane, Forward, Ban, Users, MailCheck, Lock, Key, Smartphone, Shield, ShieldOff, Network, Fingerprint,
 } from "lucide-react"
 import { toast } from "sonner"
 import type { SettingsTab, VacationAutoreply, ForwardingRule, BlockedSender, TrustedSender } from "@/types"
@@ -1687,13 +1687,8 @@ function TeamSection({ workspaceId }: { workspaceId?: string }) {
   const [members, setMembers] = useState<any[]>([])
   const [auditLogs, setAuditLogs] = useState<any[]>([])
   const [activityLogs, setActivityLogs] = useState<any[]>([])
-  const [ssoProviders, setSsoProviders] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [teamTab, setTeamTab] = useState<"members" | "audit" | "activity" | "sso">("members")
-  const [showAddSso, setShowAddSso] = useState(false)
-  const [ssoDomain, setSsoDomain] = useState("")
-  const [ssoLabel, setSsoLabel] = useState("")
-  const [addingSso, setAddingSso] = useState(false)
+  const [teamTab, setTeamTab] = useState<"members" | "audit" | "activity">("members")
   const supabase = createClient()
 
   useEffect(() => {
@@ -1701,11 +1696,9 @@ function TeamSection({ workspaceId }: { workspaceId?: string }) {
     Promise.all([
       fetch("/api/activity-logs?" + new URLSearchParams({ workspace_id: workspaceId })).then(r => r.json()),
       fetch("/api/audit-logs?" + new URLSearchParams({ workspace_id: workspaceId, limit: "50" })).then(r => r.json()),
-      fetch("/api/sso-providers?" + new URLSearchParams({ workspace_id: workspaceId })).then(r => r.json()),
-    ]).then(([activity, audit, sso]) => {
+    ]).then(([activity, audit]) => {
       setActivityLogs(Array.isArray(activity) ? activity : [])
       setAuditLogs(audit?.data || [])
-      setSsoProviders(Array.isArray(sso) ? sso : [])
       setLoading(false)
     }).catch(() => setLoading(false))
 
@@ -1721,9 +1714,6 @@ function TeamSection({ workspaceId }: { workspaceId?: string }) {
         <button onClick={() => setTeamTab("members")} className={`px-3 py-1.5 text-sm font-medium border-b-2 transition-colors ${teamTab === "members" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500"}`}>Members</button>
         <button onClick={() => setTeamTab("audit")} className={`px-3 py-1.5 text-sm font-medium border-b-2 transition-colors ${teamTab === "audit" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500"}`}>Audit Log</button>
         <button onClick={() => setTeamTab("activity")} className={`px-3 py-1.5 text-sm font-medium border-b-2 transition-colors ${teamTab === "activity" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500"}`}>Activity</button>
-        <button onClick={() => setTeamTab("sso")} className={`px-3 py-1.5 text-sm font-medium border-b-2 transition-colors ${teamTab === "sso" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500"}`}>
-          <Building2 className="h-3.5 w-3.5 inline mr-1" />SSO
-        </button>
       </div>
 
       {teamTab === "members" && (
@@ -1761,83 +1751,6 @@ function TeamSection({ workspaceId }: { workspaceId?: string }) {
             </div>
           ))}
           {activityLogs.length === 0 && <p className="text-sm text-gray-400">No activity logs</p>}
-        </div>
-      )}
-
-      {teamTab === "sso" && (
-        <div className="space-y-3">
-          <div className="text-sm text-gray-600 dark:text-gray-400">
-            Configure SAML/SSO providers so your team can sign in with their company identity provider. Requires SAML provider configuration in the <a href="https://supabase.com/dashboard" target="_blank" className="text-blue-500 underline">Supabase Dashboard</a> under Auth &gt; SSO Settings.
-          </div>
-
-          <Button size="sm" variant="outline" onClick={() => { setShowAddSso(!showAddSso); setSsoDomain(""); setSsoLabel("") }}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> Add SSO Provider
-          </Button>
-
-          {showAddSso && (
-            <div className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg space-y-2">
-              <Input value={ssoDomain} onChange={e => setSsoDomain(e.target.value)} placeholder="Domain (e.g. company.com)" className="text-sm" />
-              <Input value={ssoLabel} onChange={e => setSsoLabel(e.target.value)} placeholder="Label (e.g. Company Okta)" className="text-sm" />
-              <Button size="sm" onClick={async () => {
-                if (!ssoDomain.trim() || !workspaceId) return
-                setAddingSso(true)
-                const res = await fetch("/api/sso-providers", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ workspace_id: workspaceId, domain: ssoDomain.trim(), label: ssoLabel.trim() || null, provider: "saml" }),
-                })
-                if (res.ok) {
-                  const provider = await res.json()
-                  setSsoProviders(prev => [...prev, provider])
-                  setShowAddSso(false)
-                  setSsoDomain("")
-                  setSsoLabel("")
-                  toast.success("SSO provider added")
-                } else {
-                  const err = await res.json()
-                  toast.error(err.error || "Failed")
-                }
-                setAddingSso(false)
-              }} disabled={addingSso || !ssoDomain.trim()}>
-                {addingSso ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                Add
-              </Button>
-            </div>
-          )}
-
-          {ssoProviders.map(p => (
-            <div key={p.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 dark:bg-gray-900">
-              <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{p.label || p.domain}</p>
-                <p className="text-xs text-gray-400">{p.domain} · {p.provider.toUpperCase()} · {p.enabled ? "Active" : "Disabled"}</p>
-              </div>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" onClick={async () => {
-                  const res = await fetch("/api/sso-providers", {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ id: p.id, enabled: !p.enabled }),
-                  })
-                  if (res.ok) {
-                    setSsoProviders(prev => prev.map(sp => sp.id === p.id ? { ...sp, enabled: !p.enabled } : sp))
-                    toast.success(p.enabled ? "SSO disabled" : "SSO enabled")
-                  }
-                }}>
-                  {p.enabled ? <Shield className="h-4 w-4 text-green-500" /> : <ShieldOff className="h-4 w-4 text-gray-400" />}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={async () => {
-                  const res = await fetch(`/api/sso-providers?id=${p.id}`, { method: "DELETE" })
-                  if (res.ok) {
-                    setSsoProviders(prev => prev.filter(sp => sp.id !== p.id))
-                    toast.success("SSO provider removed")
-                  }
-                }}>
-                  <Trash2 className="h-4 w-4 text-red-400" />
-                </Button>
-              </div>
-            </div>
-          ))}
-          {ssoProviders.length === 0 && !showAddSso && <p className="text-sm text-gray-400">No SSO providers configured</p>}
         </div>
       )}
     </div>
