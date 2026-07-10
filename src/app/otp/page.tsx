@@ -131,20 +131,20 @@ function OTPContent() {
   const seconds = timeLeft % 60
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-sky-50 via-white to-blue-50 p-4">
-      <div className="w-full max-w-sm bg-white/80 backdrop-blur-sm rounded-3xl shadow-xl shadow-blue-500/5 p-8 flex flex-col items-center border border-blue-100">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-sky-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900 p-4">
+      <div className="w-full max-w-sm bg-white/80 backdrop-blur-sm dark:bg-gray-900/80 rounded-3xl shadow-xl shadow-blue-500/5 dark:shadow-black/20 p-8 flex flex-col items-center border border-blue-100 dark:border-gray-700">
         <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 mb-6 shadow-lg shadow-blue-500/20">
           <Mail className="w-7 h-7 text-white" />
         </div>
 
-        <h2 className="text-2xl font-semibold mb-1 text-gray-900">Verification Code</h2>
-        <p className="text-gray-500 text-sm mb-8 text-center">
+        <h2 className="text-2xl font-semibold mb-1 text-gray-900 dark:text-gray-100">Verification Code</h2>
+        <p className="text-gray-500 dark:text-gray-400 text-sm mb-8 text-center">
           Enter the 4-digit code sent to<br />
-          <span className="font-medium text-gray-700">{maskedEmail}</span>
+          <span className="font-medium text-gray-700 dark:text-gray-300">{maskedEmail}</span>
         </p>
 
         {error && (
-          <div className="w-full px-3 py-2 rounded-lg bg-red-50 border border-red-100 text-red-600 text-xs mb-4">
+          <div className="w-full px-3 py-2 rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-100 dark:border-red-800 text-red-600 dark:text-red-400 text-xs mb-4">
             {error}
           </div>
         )}
@@ -162,8 +162,8 @@ function OTPContent() {
               onKeyDown={(e) => handleKeyDown(i, e.key)}
               className={`w-14 h-16 text-center text-2xl font-bold rounded-xl border-2 transition-all outline-none ${
                 digit
-                  ? "border-blue-400 bg-blue-50 text-blue-700"
-                  : "border-gray-200 bg-gray-50/50 text-gray-900"
+                  ? "border-blue-400 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300"
+                  : "border-gray-200 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/50 text-gray-900 dark:text-gray-100"
               }`}
               autoFocus={i === 0}
             />
@@ -171,8 +171,8 @@ function OTPContent() {
         </div>
 
         <div className="flex items-center gap-1.5 mb-6">
-          <Clock className={`w-4 h-4 ${timeLeft === 0 ? "text-red-500" : "text-gray-400"}`} />
-          <span className={`text-sm ${timeLeft === 0 ? "text-red-500 font-medium" : "text-gray-500"}`}>
+          <Clock className={`w-4 h-4 ${timeLeft === 0 ? "text-red-500" : "text-gray-400 dark:text-gray-500"}`} />
+          <span className={`text-sm ${timeLeft === 0 ? "text-red-500 font-medium" : "text-gray-500 dark:text-gray-400"}`}>
             {timeLeft === 0 ? "Code expired" : `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`}
           </span>
         </div>
@@ -193,7 +193,7 @@ function OTPContent() {
         <button
           onClick={handleResend}
           disabled={resendCooldown > 0}
-          className="text-sm text-blue-600 hover:text-blue-700 font-medium disabled:text-gray-400 disabled:cursor-not-allowed flex items-center gap-1.5"
+          className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium disabled:text-gray-400 dark:disabled:text-gray-600 disabled:cursor-not-allowed flex items-center gap-1.5"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Code"}
@@ -201,7 +201,7 @@ function OTPContent() {
 
         <button
           onClick={() => router.push("/login")}
-          className="mt-4 text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1"
+          className="mt-4 text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 flex items-center gap-1"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Back to login
         </button>
@@ -213,8 +213,8 @@ function OTPContent() {
 export default function OTPPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-sky-50 via-white to-blue-50 p-4">
-        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-sky-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900 p-4">
+        <div className="w-8 h-8 border-2 border-blue-500 dark:border-blue-400 border-t-transparent rounded-full animate-spin" />
       </div>
     }>
       <OTPContent />

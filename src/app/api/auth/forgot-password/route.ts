@@ -10,11 +10,12 @@ export async function POST(req: Request) {
 
     const admin = createAdminClient()
 
-    // Find user by email
-    const { data: users } = await admin.auth.admin.listUsers()
-    const user = users.users.find((u: any) => u.email === email.toLowerCase())
+    const { data: user } = await admin
+      .from("users")
+      .select("id")
+      .eq("email", email.toLowerCase())
+      .maybeSingle()
     if (!user) {
-      // Don't reveal whether email exists
       return NextResponse.json({ success: true })
     }
 

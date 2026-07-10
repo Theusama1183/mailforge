@@ -6,7 +6,7 @@ import { sendEmail } from "@/lib/email"
 import crypto from "crypto"
 
 function generateOTP(): string {
-  return Math.floor(1000 + Math.random() * 9000).toString()
+  return crypto.randomInt(1000, 10000).toString()
 }
 
 function hashOTP(otp: string): string {

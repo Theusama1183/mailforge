@@ -262,3 +262,28 @@ export function truncateText(str: string, len = 80): string {
   if (cleaned.length <= len) return cleaned
   return cleaned.slice(0, len).trimEnd() + "…"
 }
+
+/**
+ * Auto-generate plain text from HTML content.
+ * Strips tags, converts <br>/<p> to newlines, normalizes whitespace.
+ */
+export function htmlToPlainText(html: string): string {
+  if (!html) return ""
+  let text = html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/tr>/gi, "\n")
+    .replace(/<\/h[1-6]>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+  text = text.replace(/\n{3,}/g, "\n\n")
+  text = text.replace(/[ \t]+\n/g, "\n")
+  return text.trim()
+}

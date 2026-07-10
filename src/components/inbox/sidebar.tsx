@@ -5,10 +5,11 @@ import { useTheme } from "@/components/theme-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useWorkspace } from "@/components/workspace-provider"
-import { Inbox, Send, Star, Archive, Trash2, FileText, AlertTriangle, Settings, LogOut, Compass, Moon, Sun, TrendingUp, LayoutTemplate, Users, Server, Contact2, ChevronDown, Check, Plus, FolderPlus, Tag, Pencil, X, Palette, BarChart3 } from "lucide-react"
+import { Inbox, Send, Star, Archive, Trash2, FileText, AlertTriangle, Settings, LogOut, Compass, Moon, Sun, TrendingUp, LayoutTemplate, Users, Server, Contact2, ChevronDown, Check, Plus, FolderPlus, Tag, X, Palette, BarChart3, ShoppingBag, Menu } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
 interface CustomFolder {
   id: string
@@ -37,16 +38,29 @@ const systemFolders = [
 
 const LABEL_COLORS = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#6366f1", "#a855f7", "#ec4899"]
 
+function navItemClass(active: boolean) {
+  return cn(
+    "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm justify-start font-normal transition-colors",
+    active
+      ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium"
+      : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200"
+  )
+}
+
 export function Sidebar({
   currentFolder,
   onFolderChange,
   onCompose,
   workspaceId,
+  open,
+  onClose,
 }: {
   currentFolder: string
   onFolderChange: (folder: string) => void
   onCompose: () => void
   workspaceId?: string
+  open?: boolean
+  onClose?: () => void
 }) {
   const { theme, setTheme } = useTheme()
   const { workspaces, activeWorkspace, setWorkspaces, switchWorkspace } = useWorkspace()
@@ -60,11 +74,10 @@ export function Sidebar({
   const [folderColor, setFolderColor] = useState("#6366f1")
   const [labelName, setLabelName] = useState("")
   const [labelColor, setLabelColor] = useState("#6366f1")
-  const [editingFolder, setEditingFolder] = useState<string | null>(null)
-  const [editingLabel, setEditingLabel] = useState<string | null>(null)
   const supabase = createClient()
   const router = useRouter()
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const sidebarRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -119,6 +132,16 @@ export function Sidebar({
     document.addEventListener("mousedown", handleClick)
     return () => document.removeEventListener("mousedown", handleClick)
   }, [])
+
+  useEffect(() => {
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === "Escape" && onClose) onClose()
+    }
+    if (open) {
+      document.addEventListener("keydown", handleEsc)
+      return () => document.removeEventListener("keydown", handleEsc)
+    }
+  }, [open, onClose])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -179,16 +202,26 @@ export function Sidebar({
     } catch { toast.error("Failed to delete label") }
   }
 
-  return (
-    <div className="w-64 bg-gray-50 dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 flex flex-col h-full select-none">
+  const handleNav = (folder: string) => {
+    onFolderChange(folder)
+    if (onClose) onClose()
+  }
+
+  const sidebarContent = (
+    <div className="flex flex-col h-full">
       {/* Brand + Workspace */}
       <div className="p-4 pb-2">
+        {onClose && (
+          <button onClick={onClose} className="lg:hidden absolute top-4 right-3 p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Close sidebar">
+            <X className="h-5 w-5" />
+          </button>
+        )}
         <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100 tracking-tight">MailForge</h1>
         {workspaces.length > 0 && (
           <div className="relative mt-3" ref={dropdownRef}>
             <button
               onClick={() => setShowWsDropdown(!showWsDropdown)}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-150 border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-700"
             >
               <div className="w-5 h-5 rounded-md bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center shrink-0">
                 <Users className="h-3 w-3 text-blue-600 dark:text-blue-400" />
@@ -197,11 +230,11 @@ export function Sidebar({
               <ChevronDown className="h-3 w-3 shrink-0 opacity-60" />
             </button>
             {showWsDropdown && (
-              <div className="absolute top-full left-0 right-0 mt-1.5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-lg z-30 py-1 max-h-48 overflow-y-auto animate-in fade-in duration-100">
+              <div className="absolute top-full left-0 right-0 mt-1.5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-lg z-30 py-1 max-h-48 overflow-y-auto">
                 {workspaces.map(ws => (
                   <button
                     key={ws.id}
-                    onClick={() => { switchWorkspace(ws.id); router.push(`/${ws.id}/inbox`); setShowWsDropdown(false) }}
+                    onClick={() => { switchWorkspace(ws.id); router.push(`/${ws.id}/inbox`); setShowWsDropdown(false); if (onClose) onClose() }}
                     className={`w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors ${
                       ws.id === activeWorkspace?.id
                         ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 font-medium"
@@ -220,15 +253,12 @@ export function Sidebar({
 
       {/* Compose */}
       <div className="px-3 py-2">
-        <Button
-          onClick={onCompose}
-          className="w-full gap-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-xl py-5 shadow-sm hover:shadow-md transition-all duration-150"
-        >
+        <Button onClick={onCompose} className="w-full gap-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-xl py-5 shadow-sm hover:shadow-md transition-all duration-150">
           <Compass className="h-4 w-4" /> Compose
         </Button>
       </div>
 
-      {/* System folders */}
+      {/* Navigation */}
       <nav className="flex-1 px-3 py-1 overflow-y-auto" aria-label="Mail folders">
         <div className="flex items-center justify-between px-2 pb-1">
           <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Mail</span>
@@ -239,17 +269,12 @@ export function Sidebar({
             const unread = localUnread[folder.id]
             const isActive = currentFolder === folder.id
             return (
-              <Button
+              <button
                 key={folder.id}
-                variant="ghost"
-                onClick={() => onFolderChange(folder.id)}
+                onClick={() => handleNav(folder.id)}
                 aria-current={isActive ? "page" : undefined}
                 aria-label={`${folder.label}${unread ? ` (${unread} unread)` : ""}`}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm justify-start font-normal transition-all duration-150 ${
-                  isActive
-                    ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium shadow-sm border-l-[3px] border-l-blue-500 dark:border-l-blue-400 rounded-l-none"
-                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200 border-l-[3px] border-l-transparent"
-                }`}
+                className={navItemClass(isActive)}
               >
                 <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span className="flex-1 text-left">{folder.label}</span>
@@ -258,7 +283,7 @@ export function Sidebar({
                     {unread > 99 ? "99+" : unread}
                   </span>
                 )}
-              </Button>
+              </button>
             )
           })}
         </div>
@@ -274,22 +299,17 @@ export function Sidebar({
                 const isActive = currentFolder === folder.id
                 return (
                   <div key={folder.id} className="group flex items-center">
-                    <Button
-                      variant="ghost"
-                      onClick={() => onFolderChange(folder.id)}
+                    <button
+                      onClick={() => handleNav(folder.id)}
                       aria-current={isActive ? "page" : undefined}
-                      className={`flex-1 flex items-center gap-3 px-3 py-2 rounded-lg text-sm justify-start font-normal transition-all duration-150 ${
-                        isActive
-                          ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium shadow-sm border-l-[3px] border-l-blue-500 dark:border-l-blue-400 rounded-l-none"
-                          : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200 border-l-[3px] border-l-transparent"
-                      }`}
+                      className={cn(navItemClass(isActive), "flex-1")}
                     >
                       <div className="w-4 h-4 rounded" style={{ backgroundColor: folder.color }} />
                       <span className="flex-1 text-left truncate">{folder.name}</span>
-                    </Button>
+                    </button>
                     <button
                       onClick={() => handleDeleteFolder(folder.id)}
-                      className="hidden group-hover:flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-red-500 shrink-0 mr-1"
+                      className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-red-500 shrink-0 mr-1 transition-opacity"
                       title="Delete folder"
                     >
                       <X className="h-3 w-3" />
@@ -301,11 +321,11 @@ export function Sidebar({
           </div>
         )}
 
-        {/* Add folder button */}
         {workspaceId && (
           <button
             onClick={() => setShowFolderForm(!showFolderForm)}
             className="flex items-center gap-2 px-3 py-1.5 mt-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg w-full transition-colors"
+            aria-label="New Folder"
           >
             <FolderPlus className="h-3.5 w-3.5" /> New Folder
           </button>
@@ -313,20 +333,15 @@ export function Sidebar({
 
         {showFolderForm && (
           <div className="px-3 py-2 mt-1 bg-gray-100 dark:bg-gray-800 rounded-lg space-y-2">
-            <Input
-              placeholder="Folder name"
-              value={folderName}
-              onChange={e => setFolderName(e.target.value)}
-              className="h-8 text-xs"
-              onKeyDown={e => e.key === "Enter" && handleCreateFolder()}
-            />
-            <div className="flex items-center gap-1.5">
+            <Input placeholder="Folder name" value={folderName} onChange={e => setFolderName(e.target.value)} className="h-8 text-xs" onKeyDown={e => e.key === "Enter" && handleCreateFolder()} />
+            <div className="flex items-center gap-1.5 flex-wrap">
               {LABEL_COLORS.map(c => (
                 <button
                   key={c}
                   onClick={() => setFolderColor(c)}
                   className={`w-5 h-5 rounded-full border-2 ${folderColor === c ? "border-gray-900 dark:border-white scale-110" : "border-transparent"}`}
                   style={{ backgroundColor: c }}
+                  aria-label={`Color ${c}`}
                 />
               ))}
             </div>
@@ -346,17 +361,16 @@ export function Sidebar({
             <div className="space-y-0.5">
               {labels.map((label) => (
                 <div key={label.id} className="group flex items-center">
-                  <Button
-                    variant="ghost"
-                    onClick={() => onFolderChange(`label:${label.id}`)}
-                    className="flex-1 flex items-center gap-3 px-3 py-2 rounded-lg text-sm justify-start font-normal text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 border-l-[3px] border-l-transparent"
+                  <button
+                    onClick={() => handleNav(`label:${label.id}`)}
+                    className={cn(navItemClass(false), "flex-1")}
                   >
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: label.color }} />
                     <span className="flex-1 text-left truncate">{label.name}</span>
-                  </Button>
+                  </button>
                   <button
                     onClick={() => handleDeleteLabel(label.id)}
-                    className="hidden group-hover:flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-red-500 shrink-0 mr-1"
+                    className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center justify-center w-6 h-6 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-red-500 shrink-0 mr-1 transition-opacity"
                     title="Delete label"
                   >
                     <X className="h-3 w-3" />
@@ -367,11 +381,11 @@ export function Sidebar({
           </div>
         )}
 
-        {/* Add label button */}
         {workspaceId && (
           <button
             onClick={() => setShowLabelForm(!showLabelForm)}
             className="flex items-center gap-2 px-3 py-1.5 mt-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg w-full transition-colors"
+            aria-label="New Label"
           >
             <Tag className="h-3.5 w-3.5" /> New Label
           </button>
@@ -379,20 +393,15 @@ export function Sidebar({
 
         {showLabelForm && (
           <div className="px-3 py-2 mt-1 bg-gray-100 dark:bg-gray-800 rounded-lg space-y-2">
-            <Input
-              placeholder="Label name"
-              value={labelName}
-              onChange={e => setLabelName(e.target.value)}
-              className="h-8 text-xs"
-              onKeyDown={e => e.key === "Enter" && handleCreateLabel()}
-            />
-            <div className="flex items-center gap-1.5">
+            <Input placeholder="Label name" value={labelName} onChange={e => setLabelName(e.target.value)} className="h-8 text-xs" onKeyDown={e => e.key === "Enter" && handleCreateLabel()} />
+            <div className="flex items-center gap-1.5 flex-wrap">
               {LABEL_COLORS.map(c => (
                 <button
                   key={c}
                   onClick={() => setLabelColor(c)}
                   className={`w-5 h-5 rounded-full border-2 ${labelColor === c ? "border-gray-900 dark:border-white scale-110" : "border-transparent"}`}
                   style={{ backgroundColor: c }}
+                  aria-label={`Color ${c}`}
                 />
               ))}
             </div>
@@ -407,38 +416,61 @@ export function Sidebar({
       {/* Bottom section */}
       <div className="px-3 py-2 border-t border-gray-100 dark:border-gray-800">
         <div className="space-y-0.5">
-          <Button variant="ghost" onClick={() => onFolderChange("analytics")} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm justify-start font-normal text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200 transition-all duration-150">
-            <TrendingUp className="h-4 w-4 shrink-0" /> <span>Analytics</span>
-          </Button>
-          <Button variant="ghost" onClick={() => onFolderChange("templates")} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm justify-start font-normal text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200 transition-all duration-150">
-            <LayoutTemplate className="h-4 w-4 shrink-0" /> <span>Templates</span>
-          </Button>
-          <Button variant="ghost" onClick={() => onFolderChange("contacts")} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm justify-start font-normal text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200 transition-all duration-150">
-            <Contact2 className="h-4 w-4 shrink-0" /> <span>Contacts</span>
-          </Button>
-          <Button variant="ghost" onClick={() => onFolderChange("ab-tests")} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm justify-start font-normal text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200 transition-all duration-150">
-            <BarChart3 className="h-4 w-4 shrink-0" /> <span>A/B Tests</span>
-          </Button>
-          <Button variant="ghost" onClick={() => onFolderChange("imap-sync")} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm justify-start font-normal text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200 transition-all duration-150">
-            <Server className="h-4 w-4 shrink-0" /> <span>IMAP Sync</span>
-          </Button>
-          <Button variant="ghost" onClick={() => onFolderChange("workspaces")} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm justify-start font-normal text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200 transition-all duration-150">
-            <Users className="h-4 w-4 shrink-0" /> <span>Workspaces</span>
-          </Button>
-          <Button variant="ghost" onClick={() => onFolderChange("settings")} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm justify-start font-normal text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200 transition-all duration-150">
-            <Settings className="h-4 w-4 shrink-0" /> <span>Settings</span>
-          </Button>
+          {[
+            { id: "analytics", label: "Analytics", icon: TrendingUp },
+            { id: "templates", label: "Templates", icon: LayoutTemplate },
+            { id: "marketplace", label: "Marketplace", icon: ShoppingBag },
+            { id: "contacts", label: "Contacts", icon: Contact2 },
+            { id: "ab-tests", label: "A/B Tests", icon: BarChart3 },
+            { id: "imap-sync", label: "IMAP Sync", icon: Server },
+            { id: "workspaces", label: "Workspaces", icon: Users },
+            { id: "settings", label: "Settings", icon: Settings },
+          ].map(item => {
+            const Icon = item.icon
+            return (
+              <button key={item.id} onClick={() => handleNav(item.id)} className={navItemClass(false)}>
+                <Icon className="h-4 w-4 shrink-0" /> <span>{item.label}</span>
+              </button>
+            )
+          })}
         </div>
         <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800 space-y-0.5">
-          <Button variant="ghost" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm justify-start font-normal text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200 transition-all duration-150" suppressHydrationWarning>
+          <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className={navItemClass(false)} suppressHydrationWarning>
             {theme === "dark" ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
             <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
-          </Button>
-          <Button variant="ghost" onClick={handleSignOut} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm justify-start font-normal text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-800 dark:hover:text-gray-200 transition-all duration-150">
+          </button>
+          <button onClick={handleSignOut} className={navItemClass(false)}>
             <LogOut className="h-4 w-4 shrink-0" /> <span>Sign Out</span>
-          </Button>
+          </button>
         </div>
       </div>
     </div>
+  )
+
+  // Normalize open to always be a boolean for hydration stability
+  const sidebarOpen = open ?? false
+
+  return (
+    <>
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={onClose} aria-hidden="true" />
+      )}
+      {/* Mobile overlay sidebar */}
+      <div
+        ref={sidebarRef}
+        className={cn(
+          "fixed top-0 left-0 z-50 h-full w-64 bg-gray-50 dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 transform transition-transform duration-200 ease-in-out lg:hidden",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+        role={open !== undefined ? "navigation" : undefined}
+        aria-label={open !== undefined ? "Mail folders" : undefined}
+      >
+        {sidebarContent}
+      </div>
+      {/* Desktop sidebar */}
+      <div className="hidden lg:flex lg:flex-col h-full w-64 bg-gray-50 dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800" role={open !== undefined ? "navigation" : undefined} aria-label={open !== undefined ? "Mail folders" : undefined}>
+        {sidebarContent}
+      </div>
+    </>
   )
 }

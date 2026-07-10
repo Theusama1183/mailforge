@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { verifyEmailToken } from "@/lib/email-token"
 import { parseUserAgent } from "@/lib/user-agent"
 import { lookupCountry } from "@/lib/geoip"
 
@@ -8,8 +9,9 @@ const PIXEL = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBR
 export async function GET(req: Request) {
   const url = new URL(req.url)
   const emailId = url.searchParams.get("email_id")
+  const sig = url.searchParams.get("sig")
 
-  if (emailId) {
+  if (emailId && sig && verifyEmailToken(emailId, sig)) {
     try {
       const supabase = createAdminClient()
       const ua = req.headers.get("user-agent") || null

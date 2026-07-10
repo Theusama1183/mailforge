@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/supabase/api-client"
-import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -16,37 +15,21 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       .select("*, workspace:workspaces!inner(created_by)")
       .eq("id", id)
       .single()
-
     if (!domain) return NextResponse.json({ error: "Domain not found" }, { status: 404 })
 
-    // Check workspace membership
     const { data: member } = await supabase
-      .from("workspace_members")
-      .select("id")
-      .eq("workspace_id", domain.workspace_id)
-      .eq("user_id", auth.user.id)
-      .single()
-
+      .from("workspace_members").select("id").eq("workspace_id", domain.workspace_id).eq("user_id", auth.user.id).single()
     if (!member) return NextResponse.json({ error: "Not a workspace member" }, { status: 403 })
 
-    const admin = createAdminClient()
-
     if (enabled && emailAddress) {
-      // Find the email address record for the catch-all target
       const { data: targetEmail } = await supabase
-        .from("email_addresses")
-        .select("id")
-        .eq("email", emailAddress)
-        .eq("domain_id", id)
-        .single()
-
+        .from("email_addresses").select("id").eq("email", emailAddress).eq("domain_id", id).single()
       if (!targetEmail) return NextResponse.json({ error: "Target email not found in domain" }, { status: 400 })
 
-      // Set all other addresses' is_catch_all to false, then set the target
-      await admin.from("email_addresses").update({ is_catch_all: false }).eq("domain_id", id)
-      await admin.from("email_addresses").update({ is_catch_all: true }).eq("id", targetEmail.id)
+      await supabase.from("email_addresses").update({ is_catch_all: false }).eq("domain_id", id)
+      await supabase.from("email_addresses").update({ is_catch_all: true }).eq("id", targetEmail.id)
     } else {
-      await admin.from("email_addresses").update({ is_catch_all: false }).eq("domain_id", id)
+      await supabase.from("email_addresses").update({ is_catch_all: false }).eq("domain_id", id)
     }
 
     return NextResponse.json({ success: true, enabled: !!enabled })

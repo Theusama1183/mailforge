@@ -5,12 +5,17 @@ import { Toaster } from "sonner"
 import { ThemeProvider } from "@/components/theme-provider"
 import { WorkspaceProvider } from "@/components/workspace-provider"
 import { CookieConsentBanner } from "@/components/cookie-consent-banner"
+import { ErrorTrackingProvider } from "@/lib/client-error-tracking"
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
+import { PaddleProvider } from "@/components/paddle-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "MailForge - Your Domain Email",
   description: "Create and manage email addresses on your own domain",
+  manifest: "/manifest.json",
+  icons: [{ url: "/icon.svg", type: "image/svg+xml" }],
 }
 
 export default function RootLayout({
@@ -20,8 +25,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#2563eb" />
+      </head>
       <body className={`${inter.className} antialiased`} suppressHydrationWarning>
         <ThemeProvider>
+          <ErrorTrackingProvider>
           <WorkspaceProvider>
             <a
               href="#main-content"
@@ -29,9 +39,23 @@ export default function RootLayout({
             >
               Skip to content
             </a>
+            <PaddleProvider />
             {children}
+            <PwaInstallPrompt />
             <CookieConsentBanner />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `
+                  if ('serviceWorker' in navigator) {
+                    window.addEventListener('load', () => {
+                      navigator.serviceWorker.register('/sw.js').catch(() => {})
+                    })
+                  }
+                `,
+              }}
+            />
           </WorkspaceProvider>
+          </ErrorTrackingProvider>
         </ThemeProvider>
         <Toaster position="top-right" richColors />
       </body>

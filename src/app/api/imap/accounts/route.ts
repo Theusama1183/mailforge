@@ -3,8 +3,13 @@ import { getAuthUser } from "@/lib/supabase/api-client"
 import crypto from "crypto"
 
 function encrypt(text: string): string {
-  const key = process.env.IMAP_ENCRYPTION_KEY || "default-dev-key-change-in-production"
-  return crypto.createCipheriv("aes-256-cbc", key.padEnd(32, "0").slice(0, 32), key.padEnd(16, "0").slice(0, 16)).update(text, "utf8", "hex") + ":" + crypto.randomBytes(8).toString("hex")
+  const key = process.env.IMAP_ENCRYPTION_KEY
+  if (!key) throw new Error("IMAP_ENCRYPTION_KEY is not set")
+  const aesKey = crypto.createHash("sha256").update(key).digest()
+  const iv = crypto.randomBytes(16)
+  const cipher = crypto.createCipheriv("aes-256-cbc", aesKey, iv)
+  const encrypted = Buffer.concat([cipher.update(text, "utf8"), cipher.final()])
+  return iv.toString("hex") + ":" + encrypted.toString("hex")
 }
 
 export async function GET(req: Request) {

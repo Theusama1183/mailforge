@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/supabase/api-client"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { lookupTxtRecord } from "@/lib/dns"
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -18,7 +17,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     if (!domain) return NextResponse.json({ error: "Domain not found" }, { status: 404 })
 
-    const admin = createAdminClient()
     const checks: Record<string, boolean> = {}
     const results: Record<string, string> = {}
 
@@ -75,7 +73,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         const txtRecords = await lookupTxtRecord(domain.domain, "TXT")
         if (txtRecords?.text?.includes(verificationToken)) {
           const now = new Date().toISOString()
-          await admin.from("email_domains").update({
+          await supabase.from("email_domains").update({
             verified_at: now,
           }).eq("id", id)
           ownershipVerified = true
@@ -92,7 +90,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Update domain with verification results
     const allPassed = checks.mx && checks.spf && checks.dkim && checks.dmarc && ownershipVerified
-    await admin.from("email_domains").update({
+    await supabase.from("email_domains").update({
       mx_verified: checks.mx,
       spf_verified: checks.spf,
       dkim_verified: checks.dkim,

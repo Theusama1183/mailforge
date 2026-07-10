@@ -7,45 +7,69 @@ on:
     branches: [main]
 
 jobs:
-  lint:
-    name: Lint & Type Check
+  quality:
+    name: Quality Checks
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
-      - run: npm ci
-      - run: npm run lint
-      - run: npx tsc --noEmit
+          cache: 'npm'
 
-  test:
+      - run: npm ci
+
+      - name: TypeScript Check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit Tests
+        run: npx jest --passWithNoTests
+
+      - name: Build
+        run: npm run build
+
+  e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    needs: quality
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: mailforge_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
+          cache: 'npm'
+
       - run: npm ci
       - run: npx playwright install chromium
-      - run: npx playwright test
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "npm"
-      - run: npm ci
-      - run: npm run build
+      - name: Start Dev Server
+        run: npm run dev &
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+
+      - name: Wait for Server
+        run: npx wait-on http://localhost:3000 --timeout 60000
+
+      - name: Run E2E Tests
+        run: npx playwright test

@@ -1,10 +1,12 @@
 "use client"
 
-import { useCallback, useState } from "react"
+import { useCallback, useState, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { decodeMimeSubject, truncateText, cleanSenderName } from "@/lib/email-utils"
 import { Star, Archive, Trash2, MailOpen, Mail, Check, Send, Clock, AlertCircle, CheckCircle2, Pin, PinOff, BellOff } from "lucide-react"
 import type { Email } from "@/types"
+
+const SWIPE_THRESHOLD = 80
 
 interface InboxItemProps {
   email: Email
@@ -38,6 +40,42 @@ export function InboxItem({
   onToggleCheck,
 }: InboxItemProps) {
   const [hovering, setHovering] = useState(false)
+  const [swipeProgress, setSwipeProgress] = useState(0)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+  const currentSwipeX = useRef(0)
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0]
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY }
+    currentSwipeX.current = 0
+    setSwipeProgress(0)
+  }, [])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return
+    const touch = e.touches[0]
+    const dx = touch.clientX - touchStartRef.current.x
+    const dy = touch.clientY - touchStartRef.current.y
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+      e.preventDefault()
+      currentSwipeX.current = dx
+      setSwipeProgress(dx)
+    }
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    const dx = currentSwipeX.current
+    if (Math.abs(dx) >= SWIPE_THRESHOLD) {
+      if (dx < 0) {
+        onArchive(email.id)
+      } else {
+        onDelete(email.id)
+      }
+    }
+    setSwipeProgress(0)
+    touchStartRef.current = null
+    currentSwipeX.current = 0
+  }, [email.id, onArchive, onDelete])
 
   const handleSelect = useCallback(() => {
     if (window.getSelection()?.toString()) return
@@ -116,16 +154,21 @@ export function InboxItem({
   const snippet = truncateText(email.body_text || email.body_html || "", 100)
   const time = formatShortTime(email.created_at)
 
+  const isSwiping = Math.abs(swipeProgress) > 0
+
   return (
     <div
       onClick={handleSelect}
       onKeyDown={handleKeyDown}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       role="button"
       tabIndex={0}
       className={cn(
-        "w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-800/80 transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset group",
+        "w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-800/80 transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-inset group relative overflow-hidden",
         isSelected
           ? "bg-blue-50 dark:bg-blue-900/20 border-l-2 border-l-blue-500"
           : "hover:bg-gray-50 dark:hover:bg-gray-900/50 border-l-2 border-l-transparent",
@@ -133,7 +176,23 @@ export function InboxItem({
       )}
       aria-current={isSelected ? "true" : undefined}
       aria-label={`${isUnread ? "Unread" : "Read"} email from ${senderName}: ${decodedSubject}`}
+      style={isSwiping ? { transform: `translateX(${swipeProgress}px)`, transition: "none" } : undefined}
     >
+      {/* Swipe action indicators */}
+      {isSwiping && swipeProgress < -20 && (
+        <div className="absolute inset-y-0 right-0 flex items-center pr-4 bg-blue-500 text-white text-xs font-medium gap-1.5"
+          style={{ width: `${Math.min(Math.abs(swipeProgress), 100)}px` }}>
+          <Archive className="h-4 w-4" />
+          <span className="hidden sm:inline">Archive</span>
+        </div>
+      )}
+      {isSwiping && swipeProgress > 20 && (
+        <div className="absolute inset-y-0 left-0 flex items-center pl-4 bg-red-500 text-white text-xs font-medium gap-1.5"
+          style={{ width: `${Math.min(Math.abs(swipeProgress), 100)}px` }}>
+          <Trash2 className="h-4 w-4" />
+          <span className="hidden sm:inline">Delete</span>
+        </div>
+      )}
       <div className="flex items-start gap-1">
         {/* Checkbox */}
         <div

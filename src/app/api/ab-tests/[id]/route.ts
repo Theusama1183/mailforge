@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/supabase/api-client"
 import { verifyWorkspaceOrOwnership } from "@/lib/workspace-utils"
+import type { ABTest, ABTestVariant } from "@/types"
+
+function normalizeTest(raw: Record<string, unknown>): ABTest {
+  const { ab_test_variants, ...rest } = raw
+  return {
+    ...rest,
+    variants: (ab_test_variants ?? []) as ABTestVariant[],
+  } as unknown as ABTest
+}
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -25,7 +34,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 })
-    return NextResponse.json(data)
+    return NextResponse.json(normalizeTest(data as unknown as Record<string, unknown>))
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch A/B test" }, { status: 500 })
   }

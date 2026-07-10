@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
-import { Check, Archive, Trash2, MailOpen, Mail, RefreshCw, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react"
+import { Check, Archive, Trash2, MailOpen, Mail, RefreshCw, ChevronDown } from "lucide-react"
 
 export type SelectType = "all" | "none" | "read" | "unread" | "starred" | "unstarred"
 
@@ -11,15 +11,11 @@ interface InboxToolbarProps {
   visibleCount: number
   selectedCount: number
   hasUnreadSelected: boolean
-  page: number
-  pageSize: number
   onSelect: (type: SelectType) => void
   onArchiveSelected: () => void
   onDeleteSelected: () => void
   onToggleReadSelected: () => void
   onRefresh: () => void
-  onPrevPage?: () => void
-  onNextPage?: () => void
 }
 
 export function InboxToolbar({
@@ -27,15 +23,11 @@ export function InboxToolbar({
   visibleCount,
   selectedCount,
   hasUnreadSelected,
-  page,
-  pageSize,
   onSelect,
   onArchiveSelected,
   onDeleteSelected,
   onToggleReadSelected,
   onRefresh,
-  onPrevPage,
-  onNextPage,
 }: InboxToolbarProps) {
   const [showSelectDropdown, setShowSelectDropdown] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -131,25 +123,7 @@ export function InboxToolbar({
       </div>
 
       <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
-        <span className="whitespace-nowrap">
-          {page * pageSize + 1}&ndash;{Math.min((page + 1) * pageSize, totalCount)} of {totalCount}
-        </span>
-        <button
-          onClick={onPrevPage}
-          className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-30"
-          disabled={page === 0}
-          aria-label="Newer"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <button
-          onClick={onNextPage}
-          className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-30"
-          disabled={(page + 1) * pageSize >= totalCount}
-          aria-label="Older"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
+        <span className="whitespace-nowrap">{totalCount} total</span>
       </div>
     </div>
   )

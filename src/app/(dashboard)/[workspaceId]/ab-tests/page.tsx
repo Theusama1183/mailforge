@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { PageHeader } from "@/components/page-header"
-import { Plus, Play, CheckCircle2, Trophy, BarChart3 } from "lucide-react"
+import { EmptyState } from "@/components/empty-state"
+import { Plus, Play, CheckCircle2, Trophy, SplitSquareVertical } from "lucide-react"
 import type { ABTest } from "@/types"
 
 export default function ABTestsPage() {
@@ -136,10 +137,12 @@ export default function ABTestsPage() {
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-indigo-500 border-t-transparent" />
             </div>
           ) : tests.length === 0 ? (
-            <div className="text-center py-20 text-gray-400">
-              <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p className="text-sm">No A/B tests yet. Create your first test to compare subject lines.</p>
-            </div>
+            <EmptyState
+              icon={SplitSquareVertical}
+              title="No A/B tests yet"
+              description="Create your first A/B test to optimize your email campaigns"
+              action={{ label: "Create Test", onClick: () => setShowCreate(true) }}
+            />
           ) : tests.map(test => {
             const variantA = test.variants?.[0]
             const variantB = test.variants?.[1]

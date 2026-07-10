@@ -258,6 +258,10 @@ export function ComposeDialog({
     firstFocusable?.focus()
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose()
+        return
+      }
       if (e.key !== "Tab") return
 
       const focusable = dialog.querySelectorAll<HTMLElement>(focusableSelector)
@@ -482,9 +486,13 @@ export function ComposeDialog({
       role="dialog"
       aria-modal="true"
       aria-label="Compose email"
-      className="fixed right-0 top-0 h-full z-50 w-[560px] max-w-[calc(100vw-2rem)] animate-[slideInFromRight_0.2s_ease-out]"
+      aria-describedby="compose-description"
+      className="fixed inset-0 md:right-0 md:top-0 md:left-auto h-full z-50 w-full md:w-[560px] md:max-w-[calc(100vw-2rem)] animate-[slideInFromRight_0.2s_ease-out]"
     >
       <div className="flex flex-col h-full bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-2xl" onPaste={handlePaste}>
+        <p id="compose-description" className="sr-only">
+          Compose a new email message. Use the form below to enter recipients, subject, and message body.
+        </p>
         <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 shrink-0">
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{modeLabel}</span>
           <div className="flex items-center gap-1">
@@ -512,7 +520,7 @@ export function ComposeDialog({
 
           <div className="flex items-center gap-2">
             <label htmlFor="compose-to" className="text-xs font-medium text-gray-500 w-8 shrink-0">To</label>
-            <ContactAutocomplete id="compose-to" value={to} onChange={setTo} placeholder="Recipients" workspaceId={workspaceId} />
+            <ContactAutocomplete id="compose-to" value={to} onChange={setTo} placeholder="Recipients" workspaceId={workspaceId} aria-required="true" />
             <div className="flex gap-2 shrink-0">
               {!showCc && <Button variant="ghost" size="sm" onClick={() => setShowCc(true)} className="text-xs text-blue-600 hover:text-blue-700 h-auto px-1" aria-label="Add Cc field">Cc</Button>}
               {!showBcc && <Button variant="ghost" size="sm" onClick={() => setShowBcc(true)} className="text-xs text-blue-600 hover:text-blue-700 h-auto px-1" aria-label="Add Bcc field">Bcc</Button>}
@@ -534,7 +542,7 @@ export function ComposeDialog({
           )}
 
           <label htmlFor="compose-subject" className="sr-only">Subject</label>
-          <Input id="compose-subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className="border-0 border-b border-gray-100 dark:border-gray-700 rounded-none px-0 h-8 text-sm font-medium focus:ring-0" />
+          <Input id="compose-subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className="border-0 border-b border-gray-100 dark:border-gray-700 rounded-none px-0 h-8 text-sm font-medium focus:ring-0" aria-required="true" />
 
           {placeholders.length > 0 && (
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3 py-2 space-y-2">
@@ -636,6 +644,10 @@ export function ComposeDialog({
               ))}
             </div>
           )}
+        </div>
+
+        <div role="status" aria-live="polite" className="sr-only">
+          {sending ? "Sending email..." : ""}
         </div>
 
         <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 dark:border-gray-700 shrink-0">

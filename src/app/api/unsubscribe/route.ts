@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { verifyEmailToken } from "@/lib/email-token"
 
 export async function GET(req: Request) {
   const url = new URL(req.url)
   const emailId = url.searchParams.get("email_id")
-  const workspaceId = url.searchParams.get("workspace_id")
+  const sig = url.searchParams.get("sig")
 
-  if (!emailId) {
-    return new NextResponse("Missing email_id", { status: 400 })
+  if (!emailId || !sig) {
+    return new NextResponse("Missing email_id or signature", { status: 400 })
+  }
+
+  if (!verifyEmailToken(emailId, sig)) {
+    return new NextResponse("Invalid signature", { status: 403 })
   }
 
   try {

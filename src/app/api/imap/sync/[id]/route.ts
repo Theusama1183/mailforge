@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/supabase/api-client"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { testImapConnection, listMailboxes, syncMailbox } from "@/lib/imap"
 import crypto from "crypto"
 
@@ -34,20 +33,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     if (!account) return NextResponse.json({ error: "Account not found" }, { status: 404 })
 
-    // Decrypt password
     let password = ""
     try {
-      const key = process.env.IMAP_ENCRYPTION_KEY || "default-dev-key-change-in-production"
+      const key = process.env.IMAP_ENCRYPTION_KEY
+      if (!key) return NextResponse.json({ error: "IMAP_ENCRYPTION_KEY not configured" }, { status: 500 })
       const parts = account.password_encrypted.split(":")
-      const decipher = crypto.createDecipheriv("aes-256-cbc", key.padEnd(32, "0").slice(0, 32), key.padEnd(16, "0").slice(0, 16))
-      password = decipher.update(parts[0], "hex", "utf8") + decipher.final("utf8")
+      if (parts.length !== 2) return NextResponse.json({ error: "Invalid encrypted password format" }, { status: 500 })
+      const aesKey = crypto.createHash("sha256").update(key).digest()
+      const decipher = crypto.createDecipheriv("aes-256-cbc", aesKey, Buffer.from(parts[0], "hex"))
+      password = decipher.update(parts[1], "hex", "utf8") + decipher.final("utf8")
     } catch {
       return NextResponse.json({ error: "Failed to decrypt password" }, { status: 500 })
     }
 
-    // Create sync log
-    const admin = createAdminClient()
-    const { data: log } = await admin.from("imap_sync_logs").insert({
+    const { data: log } = await supabase.from("imap_sync_logs").insert({
       account_id: id,
       status: "running",
     }).select().single()
@@ -111,7 +110,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         }
       }
 
-      await admin.from("imap_sync_logs").update({
+      await supabase.from("imap_sync_logs").update({
         status: "completed",
         messages_synced: totalSynced,
         completed_at: new Date().toISOString(),
@@ -119,7 +118,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
       return NextResponse.json({ synced: totalSynced })
     } catch (err) {
-      await admin.from("imap_sync_logs").update({
+      await supabase.from("imap_sync_logs").update({
         status: "failed",
         error_message: err instanceof Error ? err.message : "Unknown error",
         completed_at: new Date().toISOString(),

@@ -5,12 +5,12 @@ import { useParams, useRouter } from 'next/navigation'
 import {
   SaveOutlined, ArrowBackOutlined, UndoOutlined, RedoOutlined,
   ZoomInOutlined, ZoomOutOutlined, ContentCopyOutlined, ContentPasteOutlined,
-  ContentCutOutlined, DeleteOutlined, SearchOutlined,
+  ContentCutOutlined, DeleteOutlined, SearchOutlined, MenuOutlined, EditOutlined,
 } from '@mui/icons-material'
 import {
   Box, Button, CircularProgress, IconButton, Stack, TextField, ThemeProvider,
   Tooltip, Typography, createTheme, Dialog, DialogTitle, DialogContent,
-  DialogActions, List, ListItemButton, ListItemText, InputAdornment, Badge,
+  DialogActions, List, ListItemButton, ListItemText, InputAdornment, Badge, useMediaQuery,
 } from '@mui/material'
 import { renderToHtml } from '@/components/email-builder/render-to-html'
 import { createClient } from '@/lib/supabase/client'
@@ -25,6 +25,7 @@ import {
   scheduleAutoSave, loadAutoSave, clearAutoSave,
   searchInDocument, setSearchOpen, setSearchQuery, useSearchOpen, useSearchQuery,
   useSelectedBlockId, useDocument,
+  toggleSamplesDrawerOpen, toggleInspectorDrawerOpen,
 } from '@/components/email-builder/editor/EditorContext'
 
 const theme = createTheme()
@@ -48,6 +49,7 @@ export default function EmailBuilderPage() {
   const [searchResults, setSearchResults] = useState<string[]>([])
   const autosaveRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const supabase = createClient()
+  const isMobile = useMediaQuery('(max-width: 899px)')
 
   useEffect(() => {
     const tid = window.location.hash.replace('#', '') || null
@@ -238,72 +240,85 @@ export default function EmailBuilderPage() {
     <ThemeProvider theme={theme}>
       <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column', bgcolor: '#f5f5f5' }}>
         <Stack
-          direction="row"
-          spacing={1}
-          sx={{ px: 2, py: 0.5, borderBottom: 1, borderColor: 'divider', bgcolor: 'white', alignItems: 'center', minHeight: 48 }}
+          direction={isMobile ? 'column' : 'row'}
+          spacing={isMobile ? 0.5 : 1}
+          sx={{ px: isMobile ? 1 : 2, py: 0.5, borderBottom: 1, borderColor: 'divider', bgcolor: 'white', alignItems: isMobile ? 'stretch' : 'center', minHeight: 48 }}
         >
-          <Button size="small" startIcon={<ArrowBackOutlined />} onClick={() => router.push(`/${workspaceId}/templates`)}>
-            Back
-          </Button>
-          <TextField size="small" placeholder="Template name" value={templateName}
-            onChange={(e) => setTemplateName(e.target.value)} sx={{ minWidth: 160 }} />
-          <TextField size="small" placeholder="Subject line (optional)" value={templateSubject}
-            onChange={(e) => setTemplateSubject(e.target.value)} sx={{ minWidth: 240 }} />
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <Button size="small" startIcon={<ArrowBackOutlined />} onClick={() => router.push(`/${workspaceId}/templates`)} sx={{ minWidth: isMobile ? 'auto' : undefined }}>
+              {isMobile ? '' : 'Back'}
+            </Button>
+            {isMobile && (
+              <>
+                <IconButton size="small" onClick={toggleSamplesDrawerOpen}><MenuOutlined fontSize="small" /></IconButton>
+                <IconButton size="small" onClick={toggleInspectorDrawerOpen}><EditOutlined fontSize="small" /></IconButton>
+              </>
+            )}
+            <Box sx={{ flexGrow: 1 }} />
+            <Button variant="contained" size="small" startIcon={saved ? undefined : <SaveOutlined />}
+              onClick={handleSave} disabled={saving} color={saved ? 'success' : 'primary'} sx={{ minWidth: isMobile ? 'auto' : undefined }}>
+              {saving ? (isMobile ? '...' : 'Saving...') : saved ? (isMobile ? '✓' : 'Saved!') : isMobile ? '' : 'Save'}
+            </Button>
+          </Stack>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+            <TextField size="small" placeholder="Template name" value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)} sx={{ minWidth: isMobile ? 120 : 160, flex: isMobile ? 1 : undefined }} />
+            <TextField size="small" placeholder="Subject line (optional)" value={templateSubject}
+              onChange={(e) => setTemplateSubject(e.target.value)} sx={{ minWidth: isMobile ? 120 : 240, flex: isMobile ? 1 : undefined }} />
 
-          <Box sx={{ borderLeft: 1, borderColor: 'divider', height: 24, mx: 1 }} />
+          {!isMobile && (
+            <>
+              <Box sx={{ borderLeft: 1, borderColor: 'divider', height: 24, mx: 1 }} />
 
-          <Tooltip title="Undo (Ctrl+Z)">
-            <IconButton size="small" onClick={() => undo()}><UndoOutlined fontSize="small" /></IconButton>
-          </Tooltip>
-          <Tooltip title="Redo (Ctrl+Shift+Z)">
-            <IconButton size="small" onClick={() => redo()}><RedoOutlined fontSize="small" /></IconButton>
-          </Tooltip>
+              <Tooltip title="Undo (Ctrl+Z)">
+                <IconButton size="small" onClick={() => undo()}><UndoOutlined fontSize="small" /></IconButton>
+              </Tooltip>
+              <Tooltip title="Redo (Ctrl+Shift+Z)">
+                <IconButton size="small" onClick={() => redo()}><RedoOutlined fontSize="small" /></IconButton>
+              </Tooltip>
 
-          <Box sx={{ borderLeft: 1, borderColor: 'divider', height: 24, mx: 1 }} />
+              <Box sx={{ borderLeft: 1, borderColor: 'divider', height: 24, mx: 1 }} />
 
-          <Tooltip title="Copy (Ctrl+C)">
-            <span><IconButton size="small" disabled={!selectedBlockId} onClick={() => clipboardCopy()}><ContentCopyOutlined fontSize="small" /></IconButton></span>
-          </Tooltip>
-          <Tooltip title="Cut (Ctrl+X)">
-            <span><IconButton size="small" disabled={!selectedBlockId} onClick={() => clipboardCut()}><ContentCutOutlined fontSize="small" /></IconButton></span>
-          </Tooltip>
-          <Tooltip title="Paste (Ctrl+V)">
-            <IconButton size="small" onClick={() => clipboardPaste()}><ContentPasteOutlined fontSize="small" /></IconButton>
-          </Tooltip>
-          <Tooltip title="Duplicate (Ctrl+D)">
-            <span><IconButton size="small" disabled={!selectedBlockId} onClick={() => duplicateSelectedBlocks()}><ContentCopyOutlined fontSize="small" /></IconButton></span>
-          </Tooltip>
-          <Tooltip title="Delete (Del)">
-            <span><IconButton size="small" disabled={!selectedBlockId} onClick={() => deleteSelectedBlocks()}><DeleteOutlined fontSize="small" /></IconButton></span>
-          </Tooltip>
+              <Tooltip title="Copy (Ctrl+C)">
+                <span><IconButton size="small" disabled={!selectedBlockId} onClick={() => clipboardCopy()}><ContentCopyOutlined fontSize="small" /></IconButton></span>
+              </Tooltip>
+              <Tooltip title="Cut (Ctrl+X)">
+                <span><IconButton size="small" disabled={!selectedBlockId} onClick={() => clipboardCut()}><ContentCutOutlined fontSize="small" /></IconButton></span>
+              </Tooltip>
+              <Tooltip title="Paste (Ctrl+V)">
+                <IconButton size="small" onClick={() => clipboardPaste()}><ContentPasteOutlined fontSize="small" /></IconButton>
+              </Tooltip>
+              <Tooltip title="Duplicate (Ctrl+D)">
+                <span><IconButton size="small" disabled={!selectedBlockId} onClick={() => duplicateSelectedBlocks()}><ContentCopyOutlined fontSize="small" /></IconButton></span>
+              </Tooltip>
+              <Tooltip title="Delete (Del)">
+                <span><IconButton size="small" disabled={!selectedBlockId} onClick={() => deleteSelectedBlocks()}><DeleteOutlined fontSize="small" /></IconButton></span>
+              </Tooltip>
 
-          <Box sx={{ borderLeft: 1, borderColor: 'divider', height: 24, mx: 1 }} />
+              <Box sx={{ borderLeft: 1, borderColor: 'divider', height: 24, mx: 1 }} />
 
-          <Tooltip title="Zoom Out (Ctrl+-)">
-            <IconButton size="small" onClick={() => setZoom(zoom - 10)}><ZoomOutOutlined fontSize="small" /></IconButton>
-          </Tooltip>
-          <Typography variant="caption" sx={{ minWidth: 40, textAlign: 'center', userSelect: 'none' }}>
-            {zoom}%
-          </Typography>
-          <Tooltip title="Zoom In (Ctrl++)">
-            <IconButton size="small" onClick={() => setZoom(zoom + 10)}><ZoomInOutlined fontSize="small" /></IconButton>
-          </Tooltip>
+              <Tooltip title="Zoom Out (Ctrl+-)">
+                <IconButton size="small" onClick={() => setZoom(zoom - 10)}><ZoomOutOutlined fontSize="small" /></IconButton>
+              </Tooltip>
+              <Typography variant="caption" sx={{ minWidth: 40, textAlign: 'center', userSelect: 'none' }}>
+                {zoom}%
+              </Typography>
+              <Tooltip title="Zoom In (Ctrl++)">
+                <IconButton size="small" onClick={() => setZoom(zoom + 10)}><ZoomInOutlined fontSize="small" /></IconButton>
+              </Tooltip>
 
-          <Box sx={{ borderLeft: 1, borderColor: 'divider', height: 24, mx: 1 }} />
+              <Box sx={{ borderLeft: 1, borderColor: 'divider', height: 24, mx: 1 }} />
 
-          <Tooltip title="Search (Ctrl+F)">
-            <IconButton size="small" onClick={() => setSearchOpen(!searchOpen)}>
-              <Badge badgeContent={searchResults.length} color="primary" invisible={searchResults.length === 0 || !searchOpen}>
-                <SearchOutlined fontSize="small" />
-              </Badge>
-            </IconButton>
-          </Tooltip>
-
-          <Box sx={{ flexGrow: 1 }} />
-          <Button variant="contained" size="small" startIcon={saved ? undefined : <SaveOutlined />}
-            onClick={handleSave} disabled={saving} color={saved ? 'success' : 'primary'}>
-            {saving ? 'Saving...' : saved ? 'Saved!' : 'Save'}
-          </Button>
+              <Tooltip title="Search (Ctrl+F)">
+                <IconButton size="small" onClick={() => setSearchOpen(!searchOpen)}>
+                  <Badge badgeContent={searchResults.length} color="primary" invisible={searchResults.length === 0 || !searchOpen}>
+                    <SearchOutlined fontSize="small" />
+                  </Badge>
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
+          </Stack>
         </Stack>
 
         {saveError && (

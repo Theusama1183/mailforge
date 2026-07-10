@@ -1,0 +1,25 @@
+name: Database Migration CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Migrations
+        run: |
+          # Check migration files are sequentially numbered
+          for f in supabase/migrations/*.sql; do
+            basename "$f" | grep -qE '^[0-9]{4}_' || { echo "Bad migration name: $f"; exit 1; }
+          done
+          echo "All migration names valid"
+
+      - name: Check for Duplicate Numbers
+        run: |
+          ls supabase/migrations/*.sql | sed 's/.*\///' | cut -d'_' -f1 | sort | uniq -d | grep . && { echo "Duplicate migration numbers found"; exit 1; } || echo "No duplicates"

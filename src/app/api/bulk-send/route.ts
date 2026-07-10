@@ -134,9 +134,9 @@ export async function POST(req: Request) {
       htmlWithTracking = htmlWithTracking + trackingPixel + unsubscribeHtml
     }
 
-    // PGP encrypt for recipients with public keys
+    // PGP encrypt for recipients with public keys using authenticated client
     const pgpTo = [...resolvedTo, ...resolvedCc]
-    const { encrypted, body: pgpBody } = await encryptForRecipients(htmlWithTracking, pgpTo)
+    const { encrypted, body: pgpBody } = await encryptForRecipients(htmlWithTracking, pgpTo, supabase)
 
     const result = await sendEmail({
       smtp: {

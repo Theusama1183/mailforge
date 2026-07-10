@@ -1,6 +1,40 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
+function addSecurityHeaders(response: NextResponse): void {
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.paddle.com https://*.paddle.com",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https://*.paddle.com",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.supabase.co https://*.paddle.com",
+    "frame-src 'self' https://*.paddle.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ")
+
+  response.headers.set("Content-Security-Policy", csp)
+  response.headers.set("X-Content-Type-Options", "nosniff")
+  response.headers.set("X-Frame-Options", "DENY")
+  response.headers.set("X-XSS-Protection", "0")
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+
+  if (process.env.NODE_ENV === "production") {
+    response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
+  }
+}
+
+const PUBLIC_PATHS = [
+  "/login", "/forgot-password", "/reset-password", "/mfa-challenge",
+  "/auth", "/onboarding", "/otp", "/terms", "/privacy",
+  "/invite", "/manifest", "/_not-found",
+  "/api/webhook", "/api/workspaces", "/api/invitations",
+  "/api/track", "/api/unsubscribe", "/api/bounce",
+  "/preview",
+]
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
@@ -29,26 +63,50 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user
-    && !request.nextUrl.pathname.startsWith("/login")
-    && !request.nextUrl.pathname.startsWith("/forgot-password")
-    && !request.nextUrl.pathname.startsWith("/reset-password")
-    && !request.nextUrl.pathname.startsWith("/mfa-challenge")
-    && !request.nextUrl.pathname.startsWith("/auth")
-    && !request.nextUrl.pathname.startsWith("/onboarding")
-    && !request.nextUrl.pathname.startsWith("/otp")
-    && !request.nextUrl.pathname.startsWith("/terms")
-    && !request.nextUrl.pathname.startsWith("/privacy")
-    && !request.nextUrl.pathname.startsWith("/invite")
-    && !request.nextUrl.pathname.startsWith("/manifest")
-    && !request.nextUrl.pathname.startsWith("/api/webhook")
-    && !request.nextUrl.pathname.startsWith("/api/workspaces")
-    && !request.nextUrl.pathname.startsWith("/api/invitations")
-  ) {
+  if (user) {
+    try {
+      const { data: session } = await supabase
+        .from("user_sessions")
+        .select("revoked_at, expires_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (session?.revoked_at) {
+        await supabase.auth.signOut()
+        const url = request.nextUrl.clone()
+        url.pathname = "/login"
+        return NextResponse.redirect(url)
+      }
+
+      if (session?.expires_at && new Date(session.expires_at) < new Date()) {
+        await supabase.auth.signOut()
+        const url = request.nextUrl.clone()
+        url.pathname = "/login"
+        return NextResponse.redirect(url)
+      }
+    } catch {
+      // Session check failures should not block the request
+    }
+  }
+
+  if (!user && !PUBLIC_PATHS.some(p => request.nextUrl.pathname.startsWith(p))) {
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     return NextResponse.redirect(url)
   }
+
+  if (request.nextUrl.pathname === "/" && user) {
+    const lastWorkspaceId = request.cookies.get("mailforge_active_workspace")?.value
+    if (lastWorkspaceId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lastWorkspaceId)) {
+      const url = request.nextUrl.clone()
+      url.pathname = `/${lastWorkspaceId}/inbox`
+      return NextResponse.redirect(url)
+    }
+  }
+
+  addSecurityHeaders(supabaseResponse)
 
   return supabaseResponse
 }

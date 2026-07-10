@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useEffect } from "react"
+import { useCallback, useRef, useEffect, useState } from "react"
 import { InboxItem } from "./inbox-item"
 import { decodeMimeSubject } from "@/lib/email-utils"
 import { Mail, Send, FileText, Star, Archive, AlertTriangle, Trash2 } from "lucide-react"
@@ -17,6 +17,7 @@ interface InboxListProps {
   onDelete: (id: string) => void
   onToggleRead: (id: string, read: boolean) => void
   onToggleSelection?: (id: string) => void
+  onRefresh?: () => void
   threadCounts?: Record<string, number>
   loading?: boolean
   currentFolder?: string
@@ -47,6 +48,7 @@ export function InboxList({
   onDelete,
   onToggleRead,
   onToggleSelection,
+  onRefresh,
   threadCounts = {},
   loading = false,
   currentFolder = "inbox",
@@ -55,6 +57,9 @@ export function InboxList({
 }: InboxListProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const selectedRef = useRef<HTMLDivElement>(null)
+  const [pullDistance, setPullDistance] = useState(0)
+  const pullStartY = useRef(0)
+  const isPulling = useRef(false)
 
   useEffect(() => {
     if (selectedRef.current) {
@@ -87,6 +92,37 @@ export function InboxList({
     },
     [emails, selectedId, onSelect, onNavigate]
   )
+
+  // Pull-to-refresh touch handlers
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const container = containerRef.current
+    if (!container || container.scrollTop > 0) return
+    pullStartY.current = e.touches[0].clientY
+    isPulling.current = false
+  }, [])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    const container = containerRef.current
+    if (!container || container.scrollTop > 0) {
+      setPullDistance(0)
+      return
+    }
+
+    const dy = e.touches[0].clientY - pullStartY.current
+    if (dy > 0) {
+      isPulling.current = true
+      const clamped = Math.min(dy * 0.5, 80)
+      setPullDistance(clamped)
+    }
+  }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    if (isPulling.current && pullDistance >= 50) {
+      onRefresh?.()
+    }
+    setPullDistance(0)
+    isPulling.current = false
+  }, [pullDistance, onRefresh])
 
   if (loading) {
     return (
@@ -130,12 +166,26 @@ export function InboxList({
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto focus:outline-none"
+      className="flex-1 overflow-y-auto focus:outline-none relative"
       role="listbox"
       aria-label="Email list"
       tabIndex={0}
       onKeyDown={handleKeyDown}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
+      {pullDistance > 0 && (
+        <div
+          className="flex items-center justify-center gap-2 py-3 text-sm text-gray-500 dark:text-gray-400 transition-all"
+          style={{ height: pullDistance, opacity: pullDistance / 50 }}
+        >
+          <svg className={`w-4 h-4 ${pullDistance >= 50 ? "text-blue-500" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 5v14M5 12l7 7 7-7" />
+          </svg>
+          {pullDistance >= 50 ? "Release to refresh" : "Pull to refresh"}
+        </div>
+      )}
       {emails.map((email) => {
         const decodedSubject = decodeMimeSubject(email.subject)
         return (

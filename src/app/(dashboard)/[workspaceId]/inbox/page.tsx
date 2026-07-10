@@ -1,13 +1,12 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import dynamicImport from "next/dynamic"
 import { InboxList } from "@/components/inbox/inbox-list"
-import { InboxToolbar } from "@/components/inbox/inbox-toolbar"
 import type { SelectType } from "@/components/inbox/inbox-toolbar"
-import { ComposeDialog } from "@/components/compose/compose-dialog"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ChevronDown, Mail, Search as SearchIcon, Clock, Pin, Filter, X as XIcon } from "lucide-react"
+import { ChevronDown, Mail, Search as SearchIcon, Clock, Pin, Filter, X as XIcon, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PageHeader } from "@/components/page-header"
@@ -17,6 +16,16 @@ import { useRealtimeEmails } from "@/hooks/use-realtime-emails"
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
 import { decodeMimeSubject } from "@/lib/email-utils"
 import type { Email } from "@/types"
+
+const InboxToolbar = dynamicImport(() =>
+  import("@/components/inbox/inbox-toolbar").then((m) => ({ default: m.InboxToolbar })),
+  { loading: () => <div className="h-12" /> }
+)
+
+const ComposeDialog = dynamicImport(() =>
+  import("@/components/compose/compose-dialog").then((m) => ({ default: m.ComposeDialog })),
+  { loading: () => null }
+)
 
 export const dynamic = "force-dynamic"
 
@@ -33,6 +42,7 @@ export default function DashboardPage() {
   const [emails, setEmails] = useState<Email[]>([])
   const [showCompose, setShowCompose] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [selectedAddress, setSelectedAddress] = useState("all")
   const [showAddressDropdown, setShowAddressDropdown] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
@@ -48,8 +58,10 @@ export default function DashboardPage() {
   const [totalCount, setTotalCount] = useState(0)
   const [selectedEmailId, setSelectedEmailId] = useState<string | undefined>(undefined)
   const [showSnoozePicker, setShowSnoozePicker] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(true)
   const pageSize = 50
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -75,12 +87,53 @@ export default function DashboardPage() {
   // Reset pagination on folder/address change
   useEffect(() => {
     setPage(0)
+    setEmails([])
+    setHasMore(true)
   }, [currentFolder, selectedAddress])
 
-  // Data fetching via API (server-side pagination with rate limiting)
-  const fetchEmails = useCallback(async () => {
+  // Infinite scroll via IntersectionObserver
+  useEffect(() => {
+    const el = loadMoreRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loading && !loadingMore && hasMore && emails.length < totalCount) {
+          setPage((p) => p + 1)
+        }
+      },
+      { threshold: 0.1 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [loading, loadingMore, emails.length, totalCount, hasMore])
+
+  // Prefetch next page when current page is loaded
+  useEffect(() => {
+    if (!loading && emails.length > 0 && emails.length < totalCount) {
+      const nextOffset = (page + 1) * pageSize
+      if (searchQuery.length < 2) {
+        const params = new URLSearchParams({
+          folder: currentFolder,
+          limit: String(pageSize),
+          offset: String(nextOffset),
+        })
+        if (selectedAddress !== "all") params.set("address", selectedAddress)
+        const link = document.createElement("link")
+        link.rel = "prefetch"
+        link.href = `/api/emails?${params}`
+        document.head.appendChild(link)
+      }
+    }
+  }, [loading, page, currentFolder, selectedAddress, searchQuery, emails.length, totalCount, pageSize])
+
+  // Data fetching via API
+  const fetchEmails = useCallback(async (append = false) => {
     try {
-      setLoading(true)
+      if (append) {
+        setLoadingMore(true)
+      } else {
+        setLoading(true)
+      }
 
       // Fetch from addresses via workspace API
       if (fromAddresses.length === 0 && workspaceId) {
@@ -109,12 +162,13 @@ export default function DashboardPage() {
           setTotalCount(Array.isArray(emails) ? emails.length : 0)
         }
         setLoading(false)
+        setLoadingMore(false)
         return
       }
 
       // Server-side search when query is long enough
       if (searchQuery.length >= 2 && !isLabelFolder) {
-        const params = new URLSearchParams({ q: searchQuery, limit: String(pageSize), page: String(page) })
+        const params = new URLSearchParams({ q: searchQuery, limit: String(pageSize), page: String(append ? page : 0) })
         if (selectedAddress !== "all") params.set("address", selectedAddress)
         if (filterFrom) params.set("from", filterFrom)
         if (filterTo) params.set("to", filterTo)
@@ -127,17 +181,23 @@ export default function DashboardPage() {
         const res = await fetch(`/api/search?${params}`)
         if (res.ok) {
           const data = await res.json()
-          setEmails(data.emails || [])
+          if (append) {
+            setEmails((prev) => [...prev, ...(data.emails || [])])
+          } else {
+            setEmails(data.emails || [])
+          }
           setTotalCount(data.total || 0)
         }
         setLoading(false)
+        setLoadingMore(false)
         return
       }
 
+      const currentPage = append ? page : 0
       const params = new URLSearchParams({
         folder: currentFolder,
         limit: String(pageSize),
-        offset: String(page * pageSize),
+        offset: String(currentPage * pageSize),
       })
       if (selectedAddress !== "all") params.set("address", selectedAddress)
 
@@ -151,18 +211,33 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error("Failed to fetch")
 
       const data = await res.json()
-      setEmails(data.emails || [])
+      if (append) {
+        setEmails((prev) => [...prev, ...(data.emails || [])])
+      } else {
+        setEmails(data.emails || [])
+      }
       setTotalCount(data.count || 0)
+      if (append && (!data.emails || data.emails.length === 0)) {
+        setHasMore(false)
+      }
     } catch (err) {
       console.error("Error fetching emails:", err)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }, [currentFolder, selectedAddress, page, pageSize, fromAddresses.length, workspaceId, searchQuery, filterFrom, filterTo, filterSubject, filterHasAttachment, filterBefore, filterAfter, isLabelFolder])
 
   useEffect(() => {
     fetchEmails()
   }, [fetchEmails])
+
+  // Load more when page changes (append mode)
+  useEffect(() => {
+    if (page > 0) {
+      fetchEmails(true)
+    }
+  }, [page])
 
   // Realtime subscription via extracted hook
   useRealtimeEmails(fetchEmails, true)
@@ -243,23 +318,6 @@ export default function DashboardPage() {
     return () => window.removeEventListener("keydown", handler)
   }, [])
 
-  // Keyboard shortcuts
-  const shortcuts = useMemo(
-    () => ({
-      c: () => {
-        setShowCompose(true)
-      },
-      Escape: () => {
-        setShowSearch(false)
-        setSearchQuery("")
-        setShowAddressDropdown(false)
-      },
-    }),
-    []
-  )
-
-  useKeyboardShortcuts(shortcuts)
-
   // Action handlers
   const handleSend = async (data: { to: string[]; cc: string[]; bcc: string[]; subject: string; body: string; textBody?: string; fromAddress: string; attachments?: { filename: string; content: string }[]; inReplyTo?: string; priority?: "low" | "normal" | "high"; readReceipt?: boolean }) => {
     try {
@@ -308,15 +366,21 @@ export default function DashboardPage() {
     }
   }
 
+  const optimisticUpdate = (id: string, updates: Partial<Email>, onError?: () => void) => {
+    setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, ...updates } : e)))
+  }
+
   const handleStar = async (id: string, starred: boolean) => {
+    optimisticUpdate(id, { starred })
     const res = await fetch(`/api/emails/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ starred }),
     })
-    if (res.status === 429) { toast.error("Too many requests"); return }
-    if (res.ok) {
-      setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, starred } : e)))
+    if (res.status === 429) { toast.error("Too many requests"); optimisticUpdate(id, { starred: !starred }); return }
+    if (!res.ok) {
+      optimisticUpdate(id, { starred: !starred })
+      toast.error("Failed to update star")
     }
   }
 
@@ -324,13 +388,14 @@ export default function DashboardPage() {
     setSelectedEmailId(id)
     const email = emails.find((e) => e.id === id)
     if (email && !email.read) {
+      optimisticUpdate(id, { read: true })
       const res = await fetch(`/api/emails/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ read: true }),
       })
-      if (res.ok) {
-        setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, read: true } : e)))
+      if (!res.ok) {
+        optimisticUpdate(id, { read: false })
       }
     }
   }
@@ -340,67 +405,66 @@ export default function DashboardPage() {
   }
 
   const handleArchive = async (id: string) => {
+    const prev = emails.find((e) => e.id === id)
+    setEmails((prev) => prev.filter((e) => e.id !== id))
     const res = await fetch(`/api/emails/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ folder: "archive" }),
     })
-    if (res.status === 429) { toast.error("Too many requests"); return }
-    if (res.ok) {
-      setEmails((prev) => prev.filter((e) => e.id !== id))
-    }
+    if (res.status === 429) { toast.error("Too many requests"); if (prev) setEmails((e) => [...e, prev]); return }
+    if (!res.ok) { if (prev) setEmails((e) => [...e, prev]); toast.error("Failed to archive") }
   }
 
   const handleDelete = async (id: string) => {
+    const prev = emails.find((e) => e.id === id)
+    setEmails((prev) => prev.filter((e) => e.id !== id))
     const res = await fetch(`/api/emails/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ folder: "trash" }),
     })
-    if (res.status === 429) { toast.error("Too many requests"); return }
-    if (res.ok) {
-      setEmails((prev) => prev.filter((e) => e.id !== id))
-    }
+    if (res.status === 429) { toast.error("Too many requests"); if (prev) setEmails((e) => [...e, prev]); return }
+    if (!res.ok) { if (prev) setEmails((e) => [...e, prev]); toast.error("Failed to delete") }
   }
 
   const handleToggleRead = async (id: string, wasRead: boolean) => {
+    optimisticUpdate(id, { read: !wasRead })
     const res = await fetch(`/api/emails/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ read: !wasRead }),
     })
-    if (res.status === 429) { toast.error("Too many requests"); return }
-    if (res.ok) {
-      setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, read: !wasRead } : e)))
-    }
+    if (res.status === 429) { toast.error("Too many requests"); optimisticUpdate(id, { read: wasRead }); return }
+    if (!res.ok) { optimisticUpdate(id, { read: wasRead }); toast.error("Failed to update read status") }
   }
 
   const handlePin = async (id: string, pinned: boolean) => {
+    optimisticUpdate(id, { pinned })
     const res = await fetch(`/api/emails/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pinned }),
     })
-    if (res.status === 429) { toast.error("Too many requests"); return }
-    if (res.ok) {
-      setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, pinned } : e)))
-    }
+    if (res.status === 429) { toast.error("Too many requests"); optimisticUpdate(id, { pinned: !pinned }); return }
+    if (!res.ok) { optimisticUpdate(id, { pinned: !pinned }); toast.error("Failed to update pin") }
   }
 
   const handleSnooze = async (id: string, until: string | null) => {
+    const prev = emails.find((e) => e.id === id)
+    if (until) {
+      setEmails((prev) => prev.filter((e) => e.id !== id))
+      toast.success("Snoozed until " + new Date(until).toLocaleString())
+    } else {
+      optimisticUpdate(id, { snoozed_until: null })
+    }
     const res = await fetch(`/api/emails/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ snoozed_until: until }),
     })
     if (res.status === 429) { toast.error("Too many requests"); return }
-    if (res.ok) {
-      setEmails((prev) => prev.map((e) => (e.id === id ? { ...e, snoozed_until: until } : e)))
-      if (until) {
-        toast.success("Snoozed until " + new Date(until).toLocaleString())
-        setEmails((prev) => prev.filter((e) => e.id !== id))
-      }
-    }
+    if (!res.ok) { if (prev) setEmails((e) => [...e, prev]); toast.error("Failed to snooze") }
   }
 
   const handleAssignLabels = async (emailId: string, labelIds: string[]) => {
@@ -416,6 +480,43 @@ export default function DashboardPage() {
 
   // Selection state for toolbar
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // Keyboard shortcuts
+  const shortcuts = useMemo(
+    () => ({
+      c: () => {
+        setShowCompose(true)
+      },
+      Escape: () => {
+        setShowSearch(false)
+        setSearchQuery("")
+        setShowAddressDropdown(false)
+      },
+      e: () => {
+        const id = selectedEmailId || Array.from(selectedIds)[0]
+        if (id) handleArchive(id)
+      },
+      "#": () => {
+        const id = selectedEmailId || Array.from(selectedIds)[0]
+        if (id) handleDelete(id)
+      },
+      s: () => {
+        const id = selectedEmailId || Array.from(selectedIds)[0]
+        if (id) {
+          const email = emails.find(e => e.id === id)
+          if (email) handleStar(id, !email.starred)
+        }
+      },
+      "?": () => {
+        toast("Keyboard Shortcuts", {
+          description: "c: Compose | e: Archive | #: Delete | s: Star | r: Reply | a: Reply All | f: Forward | ?: Help",
+        })
+      },
+    }),
+    [selectedEmailId, selectedIds, emails, handleArchive, handleDelete, handleStar, toast]
+  )
+
+  useKeyboardShortcuts(shortcuts)
 
   const handleToggleSelection = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -453,38 +554,32 @@ export default function DashboardPage() {
   const handleBulkArchive = useCallback(async () => {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
+    const prevEmails = emails.filter((e) => selectedIds.has(e.id))
+    setEmails((prev) => prev.filter((e) => !selectedIds.has(e.id)))
+    setSelectedIds(new Set())
     const res = await fetch("/api/emails", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids, updates: { folder: "archive" } }),
     })
-    if (res.status === 429) { toast.error("Too many requests"); return }
-    if (res.ok) {
-      setEmails((prev) => prev.filter((e) => !selectedIds.has(e.id)))
-      setSelectedIds(new Set())
-    } else {
-      const err = await res.json()
-      toast.error(err.error || "Failed to archive")
-    }
-  }, [selectedIds])
+    if (res.status === 429) { toast.error("Too many requests"); setEmails((e) => [...e, ...prevEmails]); return }
+    if (!res.ok) { setEmails((e) => [...e, ...prevEmails]); toast.error("Failed to archive") }
+  }, [selectedIds, emails])
 
   const handleBulkDelete = useCallback(async () => {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
+    const prevEmails = emails.filter((e) => selectedIds.has(e.id))
+    setEmails((prev) => prev.filter((e) => !selectedIds.has(e.id)))
+    setSelectedIds(new Set())
     const res = await fetch("/api/emails", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids }),
     })
-    if (res.status === 429) { toast.error("Too many requests"); return }
-    if (res.ok) {
-      setEmails((prev) => prev.filter((e) => !selectedIds.has(e.id)))
-      setSelectedIds(new Set())
-    } else {
-      const err = await res.json()
-      toast.error(err.error || "Failed to delete")
-    }
-  }, [selectedIds])
+    if (res.status === 429) { toast.error("Too many requests"); setEmails((e) => [...e, ...prevEmails]); return }
+    if (!res.ok) { setEmails((e) => [...e, ...prevEmails]); toast.error("Failed to delete") }
+  }, [selectedIds, emails])
 
   const handleBulkToggleRead = useCallback(async () => {
     const ids = Array.from(selectedIds)
@@ -494,20 +589,16 @@ export default function DashboardPage() {
       return email && !email.read
     })
     const newRead = !hasUnread
+    setEmails((prev) =>
+      prev.map((e) => (selectedIds.has(e.id) ? { ...e, read: newRead } : e))
+    )
     const res = await fetch("/api/emails", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids, updates: { read: newRead } }),
     })
-    if (res.status === 429) { toast.error("Too many requests"); return }
-    if (res.ok) {
-      setEmails((prev) =>
-        prev.map((e) => (selectedIds.has(e.id) ? { ...e, read: newRead } : e))
-      )
-    } else {
-      const err = await res.json()
-      toast.error(err.error || "Failed to update")
-    }
+    if (res.status === 429) { toast.error("Too many requests"); setEmails((prev) => prev.map((e) => (selectedIds.has(e.id) ? { ...e, read: !newRead } : e))); return }
+    if (!res.ok) { setEmails((prev) => prev.map((e) => (selectedIds.has(e.id) ? { ...e, read: !newRead } : e))); toast.error("Failed to update") }
   }, [selectedIds, emails])
 
   const hasUnreadSelected = useMemo(
@@ -521,16 +612,9 @@ export default function DashboardPage() {
 
   const handleRefresh = useCallback(() => {
     setPage(0)
+    setEmails([])
     fetchEmails()
   }, [fetchEmails])
-
-  const handlePrevPage = useCallback(() => {
-    setPage((p) => Math.max(0, p - 1))
-  }, [])
-
-  const handleNextPage = useCallback(() => {
-    setPage((p) => p + 1)
-  }, [])
 
   const handleFolderChange = (folder: string) => {
     if (["settings", "analytics", "templates", "imap-sync", "workspaces", "contacts"].includes(folder)) {
@@ -710,15 +794,11 @@ export default function DashboardPage() {
         visibleCount={displayEmails.length}
         selectedCount={selectedIds.size}
         hasUnreadSelected={hasUnreadSelected}
-        page={page}
-        pageSize={pageSize}
         onSelect={handleSelectType}
         onArchiveSelected={handleBulkArchive}
         onDeleteSelected={handleBulkDelete}
         onToggleReadSelected={handleBulkToggleRead}
         onRefresh={handleRefresh}
-        onPrevPage={handlePrevPage}
-        onNextPage={handleNextPage}
       />
 
       <div className="flex-1 flex overflow-hidden">
@@ -734,14 +814,22 @@ export default function DashboardPage() {
             onDelete={handleDelete}
             onToggleRead={handleToggleRead}
             onToggleSelection={handleToggleSelection}
+            onRefresh={handleRefresh}
             threadCounts={threadCounts}
             loading={loading}
             currentFolder={currentFolder}
             onPin={handlePin}
             onSnooze={handleSnooze}
-            onAssignLabels={handleAssignLabels}
-            labels={[]}
           />
+          {loadingMore && (
+            <div className="flex items-center justify-center py-4 text-sm text-gray-400">
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Loading more...
+            </div>
+          )}
+          {emails.length < totalCount && !loadingMore && (
+            <div ref={loadMoreRef} className="h-4" />
+          )}
         </div>
       </div>
 

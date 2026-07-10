@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/supabase/api-client"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { sendEmail } from "@/lib/send"
 import crypto from "crypto"
 
@@ -42,7 +41,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ error: "SMTP not configured" }, { status: 400 })
     }
 
-    const admin = createAdminClient()
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || `https://${req.headers.get("host") || "localhost:3000"}`
     const sendFrom = fromAddress || `you@${domain.domain}`
 
@@ -78,7 +76,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           html,
           text: variantA.body_text || undefined,
         })
-        await admin.from("emails").insert({
+        await supabase.from("emails").insert({
           id: emailId, user_id: user.id, mailbox_address: sendFrom, from_address: sendFrom,
           to_addresses: [recipient], subject: variantA.subject, body_html: html,
           body_text: variantA.body_text, direction: "outbound", folder: "sent",
@@ -111,7 +109,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           html,
           text: variantB.body_text || undefined,
         })
-        await admin.from("emails").insert({
+        await supabase.from("emails").insert({
           id: emailId, user_id: user.id, mailbox_address: sendFrom, from_address: sendFrom,
           to_addresses: [recipient], subject: variantB.subject, body_html: html,
           body_text: variantB.body_text, direction: "outbound", folder: "sent",

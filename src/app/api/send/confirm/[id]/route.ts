@@ -71,9 +71,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // Replace unsubscribe placeholder with real URL
     const htmlWithUnsub = (email.body_html || "").replace(/\{\{unsubscribe_url\}\}/g, unsubscribeUrl)
 
-    // PGP encrypt for recipients with public keys
+    // PGP encrypt for recipients with public keys using authenticated client
     const allRecipients = [...email.to_addresses, ...(email.cc_addresses || [])]
-    const { encrypted, body: pgpBody } = await encryptForRecipients(htmlWithUnsub, allRecipients)
+    const { encrypted, body: pgpBody } = await encryptForRecipients(htmlWithUnsub, allRecipients, supabase)
 
     const result = await sendEmail({
       smtp: {

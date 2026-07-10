@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/supabase/api-client"
-import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {

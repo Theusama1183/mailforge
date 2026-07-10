@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Select } from "@/components/ui/select"
 import { Plus, Trash2, RefreshCw, Server, List, Clock, History } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
+import { EmptyState } from "@/components/empty-state"
 import { toast } from "sonner"
 
 interface ImapAccount {
@@ -239,9 +240,12 @@ export default function ImapSettingsPage() {
           ) : (
             <div className="space-y-3">
               {accounts.length === 0 && (
-                <p className="text-sm text-gray-400 text-center py-10">
-                  No IMAP accounts configured. Add one to import emails from external mailboxes.
-                </p>
+                <EmptyState
+                  icon={RefreshCw}
+                  title="No IMAP connections yet"
+                  description="Connect an external email account to sync messages into MailForge"
+                  action={{ label: "Add Connection", onClick: () => setShowForm(true) }}
+                />
               )}
               {accounts.map(acc => (
                 <div key={acc.id}>

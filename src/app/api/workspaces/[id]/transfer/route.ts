@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/supabase/api-client"
-import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -36,8 +35,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!member) return NextResponse.json({ error: "Target user is not a workspace member" }, { status: 400 })
     if (member.role === "admin") return NextResponse.json({ error: "Target is already an admin" }, { status: 400 })
 
-    const admin = createAdminClient()
-
     // Demote current owner to admin, promote new owner
     const { error: err1 } = await supabase
       .from("workspace_members")
@@ -47,7 +44,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     if (err1) return NextResponse.json({ error: err1.message }, { status: 500 })
 
-    const { error: err2 } = await admin
+    const { error: err2 } = await supabase
       .from("workspace_members")
       .update({ role: "owner" })
       .eq("workspace_id", id)

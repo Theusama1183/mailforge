@@ -2,22 +2,24 @@ import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/supabase/api-client"
 import { createAdminClient } from "@/lib/supabase/admin"
 
+function getAdminClient() {
+  return createAdminClient()
+}
+
 export async function GET(req: Request) {
   try {
     const auth = await getAuthUser(req)
-    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const { user: authUser } = auth
-    if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { user: authUser, supabase } = auth
 
-    const admin = createAdminClient()
-    const [userRes, profileRes] = await Promise.all([
-      admin.from("users").select("id, email, name, created_at").eq("id", authUser.id).single(),
-      admin.from("user_profiles").select("*").eq("user_id", authUser.id).maybeSingle(),
-    ])
+    const admin = getAdminClient()
+    const { data: userData, error: userErr } = await admin
+      .from("users").select("id, email, name, created_at").eq("id", authUser.id).single()
+    if (userErr) return NextResponse.json({ error: userErr.message }, { status: 500 })
 
-    if (userRes.error) return NextResponse.json({ error: userRes.error.message }, { status: 500 })
-    return NextResponse.json({ ...userRes.data, profile: profileRes.data || null })
-  } catch (error) {
+    const { data: profile } = await supabase.from("user_profiles").select("*").eq("user_id", authUser.id).maybeSingle()
+    return NextResponse.json({ ...userData, profile: profile || null })
+  } catch {
     return NextResponse.json({ error: "Failed to fetch profile" }, { status: 500 })
   }
 }
@@ -25,17 +27,14 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   try {
     const auth = await getAuthUser(req)
-    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const { user: authUser } = auth
-    if (!authUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!auth?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { user: authUser, supabase } = auth
 
     const body = await req.json()
-    const admin = createAdminClient()
+    const admin = getAdminClient()
     const updates: Record<string, unknown> = {}
 
-    if (body.name !== undefined) {
-      updates.name = body.name.trim()
-    }
+    if (body.name !== undefined) updates.name = body.name.trim()
 
     if (body.timezone !== undefined || body.language !== undefined || body.avatar_url !== undefined) {
       const profileFields: Record<string, unknown> = { updated_at: new Date().toISOString() }
@@ -43,11 +42,11 @@ export async function PUT(req: Request) {
       if (body.language !== undefined) profileFields.language = body.language
       if (body.avatar_url !== undefined) profileFields.avatar_url = body.avatar_url
 
-      const { data: existing } = await admin.from("user_profiles").select("id").eq("user_id", authUser.id).maybeSingle()
+      const { data: existing } = await supabase.from("user_profiles").select("id").eq("user_id", authUser.id).maybeSingle()
       if (existing) {
-        await admin.from("user_profiles").update(profileFields).eq("user_id", authUser.id)
+        await supabase.from("user_profiles").update(profileFields).eq("user_id", authUser.id)
       } else {
-        await admin.from("user_profiles").insert({ user_id: authUser.id, ...profileFields })
+        await supabase.from("user_profiles").insert({ user_id: authUser.id, ...profileFields })
       }
     }
 
@@ -60,9 +59,9 @@ export async function PUT(req: Request) {
       userData = data
     }
 
-    const { data: profile } = await admin.from("user_profiles").select("*").eq("user_id", authUser.id).maybeSingle()
+    const { data: profile } = await supabase.from("user_profiles").select("*").eq("user_id", authUser.id).maybeSingle()
     return NextResponse.json({ ...userData, profile: profile || null })
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to update profile" }, { status: 500 })
   }
 }
