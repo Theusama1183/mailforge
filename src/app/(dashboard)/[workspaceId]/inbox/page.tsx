@@ -5,8 +5,8 @@ import dynamicImport from "next/dynamic"
 import { InboxList } from "@/components/inbox/inbox-list"
 import type { SelectType } from "@/components/inbox/inbox-toolbar"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter, useSearchParams } from "next/navigation"
-import { ChevronDown, Mail, Search as SearchIcon, Clock, Pin, Filter, X as XIcon, Loader2 } from "lucide-react"
+import { useRouter, useSearchParams, useParams } from "next/navigation"
+import { ChevronDown, Search as SearchIcon, Filter, X as XIcon, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PageHeader } from "@/components/page-header"
@@ -62,20 +62,16 @@ export default function DashboardPage() {
   const pageSize = 50
   const searchInputRef = useRef<HTMLInputElement>(null)
   const loadMoreRef = useRef<HTMLDivElement>(null)
+  const pageRef = useRef(0)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const params = useParams()
   const supabase = createClient()
 
   const [fromAddresses, setFromAddresses] = useState<{ local_part: string; domain: string; full: string }[]>([])
-  const [workspaceId, setWorkspaceId] = useState<string>("")
+  const workspaceId = (params?.workspaceId as string) || ""
 
   const isLabelFolder = currentFolder.startsWith("label:")
-
-  useEffect(() => {
-    const path = window.location.pathname
-    const segments = path.split("/").filter(Boolean)
-    if (segments.length > 0) setWorkspaceId(segments[0])
-  }, [])
 
   useEffect(() => {
     const folder = searchParams.get("folder")
@@ -86,45 +82,11 @@ export default function DashboardPage() {
 
   // Reset pagination on folder/address change
   useEffect(() => {
+    pageRef.current = 0
     setPage(0)
     setEmails([])
     setHasMore(true)
   }, [currentFolder, selectedAddress])
-
-  // Infinite scroll via IntersectionObserver
-  useEffect(() => {
-    const el = loadMoreRef.current
-    if (!el) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !loading && !loadingMore && hasMore && emails.length < totalCount) {
-          setPage((p) => p + 1)
-        }
-      },
-      { threshold: 0.1 }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [loading, loadingMore, emails.length, totalCount, hasMore])
-
-  // Prefetch next page when current page is loaded
-  useEffect(() => {
-    if (!loading && emails.length > 0 && emails.length < totalCount) {
-      const nextOffset = (page + 1) * pageSize
-      if (searchQuery.length < 2) {
-        const params = new URLSearchParams({
-          folder: currentFolder,
-          limit: String(pageSize),
-          offset: String(nextOffset),
-        })
-        if (selectedAddress !== "all") params.set("address", selectedAddress)
-        const link = document.createElement("link")
-        link.rel = "prefetch"
-        link.href = `/api/emails?${params}`
-        document.head.appendChild(link)
-      }
-    }
-  }, [loading, page, currentFolder, selectedAddress, searchQuery, emails.length, totalCount, pageSize])
 
   // Data fetching via API
   const fetchEmails = useCallback(async (append = false) => {
@@ -168,7 +130,7 @@ export default function DashboardPage() {
 
       // Server-side search when query is long enough
       if (searchQuery.length >= 2 && !isLabelFolder) {
-        const params = new URLSearchParams({ q: searchQuery, limit: String(pageSize), page: String(append ? page : 0) })
+        const params = new URLSearchParams({ q: searchQuery, limit: String(pageSize), page: String(append ? pageRef.current : 0) })
         if (selectedAddress !== "all") params.set("address", selectedAddress)
         if (filterFrom) params.set("from", filterFrom)
         if (filterTo) params.set("to", filterTo)
@@ -193,7 +155,7 @@ export default function DashboardPage() {
         return
       }
 
-      const currentPage = append ? page : 0
+      const currentPage = append ? pageRef.current : 0
       const params = new URLSearchParams({
         folder: currentFolder,
         limit: String(pageSize),
@@ -226,21 +188,77 @@ export default function DashboardPage() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [currentFolder, selectedAddress, page, pageSize, fromAddresses.length, workspaceId, searchQuery, filterFrom, filterTo, filterSubject, filterHasAttachment, filterBefore, filterAfter, isLabelFolder])
+  }, [currentFolder, selectedAddress, pageSize, fromAddresses.length, workspaceId, searchQuery, filterFrom, filterTo, filterSubject, filterHasAttachment, filterBefore, filterAfter, isLabelFolder])
+
+  // Store fetchEmails in ref for use in IntersectionObserver without stale closure
+  const fetchEmailsRef = useRef(fetchEmails)
+  useEffect(() => {
+    fetchEmailsRef.current = fetchEmails
+  })
 
   useEffect(() => {
     fetchEmails()
   }, [fetchEmails])
 
-  // Load more when page changes (append mode)
+  // Infinite scroll via IntersectionObserver
   useEffect(() => {
-    if (page > 0) {
-      fetchEmails(true)
-    }
-  }, [page])
+    const el = loadMoreRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loading && !loadingMore && hasMore && emails.length < totalCount) {
+          const nextPage = page + 1
+          pageRef.current = nextPage
+          setPage(nextPage)
+          fetchEmailsRef.current(true)
+        }
+      },
+      { threshold: 0.1 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [loading, loadingMore, emails.length, totalCount, hasMore, page])
 
-  // Realtime subscription via extracted hook
-  useRealtimeEmails(fetchEmails, true)
+  // Prefetch next page when current page is loaded
+  useEffect(() => {
+    if (!loading && emails.length > 0 && emails.length < totalCount) {
+      const nextOffset = (page + 1) * pageSize
+      if (searchQuery.length < 2) {
+        const params = new URLSearchParams({
+          folder: currentFolder,
+          limit: String(pageSize),
+          offset: String(nextOffset),
+        })
+        if (selectedAddress !== "all") params.set("address", selectedAddress)
+        const link = document.createElement("link")
+        link.rel = "prefetch"
+        link.href = `/api/emails?${params}`
+        document.head.appendChild(link)
+      }
+    }
+  }, [loading, page, currentFolder, selectedAddress, searchQuery, emails.length, totalCount, pageSize])
+
+  // Silent refetch for realtime updates (no loading skeleton)
+  const silentRefetch = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({
+        folder: currentFolder,
+        limit: String(pageSize),
+        offset: "0",
+      })
+      if (selectedAddress !== "all") params.set("address", selectedAddress)
+
+      const res = await fetch(`/api/emails?${params}`)
+      if (res.ok) {
+        const data = await res.json()
+        setEmails(data.emails || [])
+        setTotalCount(data.count || 0)
+      }
+    } catch {}
+  }, [currentFolder, selectedAddress, pageSize])
+
+  // Realtime subscription via extracted hook (silent - no loading skeleton)
+  useRealtimeEmails(silentRefetch, true)
 
   // Thread grouping using message_id / in_reply_to / references chain
   const getThreadKey = (email: Email): string => {

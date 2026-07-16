@@ -105,6 +105,7 @@ export async function POST(req: Request) {
     for (const uid of userIds) {
       const { error } = await supabase.from("emails").insert({
         user_id: uid,
+        workspace_id: incomingWorkspaceId || null,
         mailbox_address: to,
         from_address: fromAddress,
         from_name: fromName,

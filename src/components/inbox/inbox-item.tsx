@@ -38,6 +38,8 @@ export function InboxItem({
   onDelete,
   onToggleRead,
   onToggleCheck,
+  onPin,
+  onSnooze,
 }: InboxItemProps) {
   const [hovering, setHovering] = useState(false)
   const [swipeProgress, setSwipeProgress] = useState(0)
@@ -147,6 +149,21 @@ export function InboxItem({
       }
     },
     [email.id, onToggleCheck]
+  )
+  const handlePin = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      onPin?.(email.id, !email.pinned)
+    },
+    [email.id, email.pinned, onPin]
+  )
+  const handleSnooze = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      const until = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+      onSnooze?.(email.id, until)
+    },
+    [email.id, onSnooze]
   )
 
   const decodedSubject = decodeMimeSubject(email.subject)
@@ -327,6 +344,24 @@ export function InboxItem({
                 title={isUnread ? "Mark as read" : "Mark as unread"}
               >
                 {isUnread ? <MailOpen className="h-3.5 w-3.5" /> : <Mail className="h-3.5 w-3.5" />}
+              </button>
+              <button
+                onClick={handlePin}
+                type="button"
+                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-amber-500 transition-colors"
+                aria-label={email.pinned ? "Unpin" : "Pin"}
+                title={email.pinned ? "Unpin" : "Pin"}
+              >
+                {email.pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+              </button>
+              <button
+                onClick={handleSnooze}
+                type="button"
+                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-purple-500 transition-colors"
+                aria-label="Snooze"
+                title="Snooze for 1 hour"
+              >
+                <Clock className="h-3.5 w-3.5" />
               </button>
             </div>
           ) : (
