@@ -48,6 +48,7 @@ export default function LoginPage() {
         // Sign in to create a session (user was created with email_confirm:true)
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
         if (signInError) throw signInError
+        await supabase.auth.getSession()
         // Send OTP for email verification
         const otpRes = await fetch("/api/auth/send-otp", {
           method: "POST",
@@ -65,6 +66,11 @@ export default function LoginPage() {
         if (error) throw error
 
         try { recordSession() } catch {}
+
+        // Ensure the SSR auth cookies are flushed before navigating.
+        // Without this, the middleware may see a null session right after
+        // signInWithPassword and redirect back to /login.
+        await supabase.auth.getSession()
 
         // Check if MFA is required
         const { data: factors } = await supabase.auth.mfa.listFactors().catch(() => ({ data: null }))
@@ -106,7 +112,6 @@ export default function LoginPage() {
           router.push("/workspaces")
         }
       }
-      router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong")
     } finally {

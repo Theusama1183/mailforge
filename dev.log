@@ -1,0 +1,256 @@
+
+> mailforge@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.9 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.56.1:3000
+- Environments: .env.local
+✓ Ready in 2.5s
+- Experiments (use with caution):
+  · serverActions
+
+○ Compiling /login ...
+ GET /login 200 in 13.9s (next.js: 12.5s, proxy.ts: 19ms, application-code: 1391ms)
+ GET /login?code=fff9e44f-550e-4fd3-a0e5-c69b9e035256 200 in 217ms (next.js: 17ms, proxy.ts: 14ms, application-code: 186ms)
+(node:11404) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+ GET /login?code=1f2865a6-5027-4a7d-8e38-7472548bca9f 200 in 189ms (next.js: 36ms, proxy.ts: 13ms, application-code: 140ms)
+ GET /auth/callback?code=241e4cd2-7d5e-4043-af1f-a200b0fd3014 200 in 1992ms (next.js: 1570ms, proxy.ts: 14ms, application-code: 408ms)
+ GET /login 200 in 357ms (next.js: 25ms, proxy.ts: 212ms, application-code: 119ms)
+ POST /login 200 in 562ms (next.js: 53ms, proxy.ts: 182ms, application-code: 327ms)
+ POST /login 200 in 551ms (next.js: 16ms, proxy.ts: 180ms, application-code: 355ms)
+ GET /login 200 in 52ms (next.js: 15ms, proxy.ts: 11ms, application-code: 26ms)
+ GET /login 200 in 115ms (next.js: 15ms, proxy.ts: 11ms, application-code: 89ms)
+ POST /login 200 in 324ms (next.js: 15ms, proxy.ts: 176ms, application-code: 133ms)
+ GET /login 200 in 317ms (next.js: 19ms, proxy.ts: 183ms, application-code: 115ms)
+ GET /auth/callback 200 in 173ms (next.js: 29ms, proxy.ts: 21ms, application-code: 124ms)
+ GET /auth/callback 200 in 124ms (next.js: 16ms, proxy.ts: 13ms, application-code: 95ms)
+ GET /login 200 in 182ms (next.js: 29ms, proxy.ts: 17ms, application-code: 136ms)
+ GET /login 200 in 395ms (next.js: 116ms, proxy.ts: 34ms, application-code: 244ms)
+ GET /login?code=1f2865a6-5027-4a7d-8e38-7472548bca9f 200 in 489ms (next.js: 34ms, proxy.ts: 28ms, application-code: 426ms)
+✓ Compiled in 495ms
+ GET /login?code=fff9e44f-550e-4fd3-a0e5-c69b9e035256 200 in 650ms (next.js: 281ms, proxy.ts: 242ms, application-code: 127ms)
+✓ Compiled in 530ms
+⨯ ./src/app/login/page.tsx:267:1
+Expected '}', got '<eof>'
+  [90m265 |[0m   )
+  [90m266 |[0m }
+[31m[1m>[0m [90m267 |[0m
+  [90m    |[0m [31m[1m^[0m
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/login/page.tsx [Client Component Browser]
+    ./src/app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/login/page.tsx [Client Component SSR]
+    ./src/app/login/page.tsx [Server Component]
+
+
+
+./src/app/login/page.tsx:113:7
+Expected a semicolon
+  [90m111 |[0m         router.push([32m"/workspaces"[0m)
+  [90m112 |[0m       }
+[31m[1m>[0m [90m113 |[0m     } [36mcatch[0m (err) {
+  [90m    |[0m       [31m[1m^^^^^[0m
+  [90m114 |[0m       setError(err [36minstanceof[0m [33mError[0m ? err.message : [32m"Something went wrong"[0m)
+  [90m115 |[0m     } [36mfinally[0m {
+  [90m116 |[0m       setLoading([36mfalse[0m)
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/login/page.tsx [Client Component Browser]
+    ./src/app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/login/page.tsx [Client Component SSR]
+    ./src/app/login/page.tsx [Server Component]
+
+
+
+./src/app/login/page.tsx:120:3
+Expected a semicolon
+  [90m118 |[0m   }
+  [90m119 |[0m
+[31m[1m>[0m [90m120 |[0m   [36mreturn[0m (
+  [90m    |[0m   [31m[1m^[0m
+  [90m121 |[0m     <div className=[32m"min-h-screen w-full flex items-center justify-center bg-gradient-to-b...[0m
+  [90m122 |[0m       <div className=[32m"w-full max-w-sm bg-white/80 backdrop-blur-sm dark:bg-gray-900/80 ro...[0m
+  [90m123 |[0m         <div className=[32m"flex items-center justify-center w-14 h-14 rounded-2xl bg-gradien...[0m
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/login/page.tsx [Client Component Browser]
+    ./src/app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/login/page.tsx [Client Component SSR]
+    ./src/app/login/page.tsx [Server Component]
+
+
+○ Compiling /_error ...
+ GET /login?code=fff9e44f-550e-4fd3-a0e5-c69b9e035256 500 in 6.7s (next.js: 5.9s, proxy.ts: 213ms, application-code: 608ms)
+⨯ ./src/app/login/page.tsx:267:1
+Expected '}', got '<eof>'
+  [90m265 |[0m   )
+  [90m266 |[0m }
+[31m[1m>[0m [90m267 |[0m
+  [90m    |[0m [31m[1m^[0m
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/login/page.tsx [Client Component Browser]
+    ./src/app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/login/page.tsx [Client Component SSR]
+    ./src/app/login/page.tsx [Server Component]
+
+
+
+./src/app/login/page.tsx:113:7
+Expected a semicolon
+  [90m111 |[0m         router.push([32m"/workspaces"[0m)
+  [90m112 |[0m       }
+[31m[1m>[0m [90m113 |[0m     } [36mcatch[0m (err) {
+  [90m    |[0m       [31m[1m^^^^^[0m
+  [90m114 |[0m       setError(err [36minstanceof[0m [33mError[0m ? err.message : [32m"Something went wrong"[0m)
+  [90m115 |[0m     } [36mfinally[0m {
+  [90m116 |[0m       setLoading([36mfalse[0m)
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/login/page.tsx [Client Component Browser]
+    ./src/app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/login/page.tsx [Client Component SSR]
+    ./src/app/login/page.tsx [Server Component]
+
+
+
+./src/app/login/page.tsx:120:3
+Expected a semicolon
+  [90m118 |[0m   }
+  [90m119 |[0m
+[31m[1m>[0m [90m120 |[0m   [36mreturn[0m (
+  [90m    |[0m   [31m[1m^[0m
+  [90m121 |[0m     <div className=[32m"min-h-screen w-full flex items-center justify-center bg-gradient-to-b...[0m
+  [90m122 |[0m       <div className=[32m"w-full max-w-sm bg-white/80 backdrop-blur-sm dark:bg-gray-900/80 ro...[0m
+  [90m123 |[0m         <div className=[32m"flex items-center justify-center w-14 h-14 rounded-2xl bg-gradien...[0m
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/login/page.tsx [Client Component Browser]
+    ./src/app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/login/page.tsx [Client Component SSR]
+    ./src/app/login/page.tsx [Server Component]
+
+
+ GET /login?code=fff9e44f-550e-4fd3-a0e5-c69b9e035256 500 in 157ms (next.js: 101ms, proxy.ts: 14ms, application-code: 42ms)
+⨯ ./src/app/login/page.tsx:267:1
+Expected '}', got '<eof>'
+  [90m265 |[0m   )
+  [90m266 |[0m }
+[31m[1m>[0m [90m267 |[0m
+  [90m    |[0m [31m[1m^[0m
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/login/page.tsx [Client Component Browser]
+    ./src/app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/login/page.tsx [Client Component SSR]
+    ./src/app/login/page.tsx [Server Component]
+
+
+
+./src/app/login/page.tsx:113:7
+Expected a semicolon
+  [90m111 |[0m         router.push([32m"/workspaces"[0m)
+  [90m112 |[0m       }
+[31m[1m>[0m [90m113 |[0m     } [36mcatch[0m (err) {
+  [90m    |[0m       [31m[1m^^^^^[0m
+  [90m114 |[0m       setError(err [36minstanceof[0m [33mError[0m ? err.message : [32m"Something went wrong"[0m)
+  [90m115 |[0m     } [36mfinally[0m {
+  [90m116 |[0m       setLoading([36mfalse[0m)
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/login/page.tsx [Client Component Browser]
+    ./src/app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/login/page.tsx [Client Component SSR]
+    ./src/app/login/page.tsx [Server Component]
+
+
+
+./src/app/login/page.tsx:120:3
+Expected a semicolon
+  [90m118 |[0m   }
+  [90m119 |[0m
+[31m[1m>[0m [90m120 |[0m   [36mreturn[0m (
+  [90m    |[0m   [31m[1m^[0m
+  [90m121 |[0m     <div className=[32m"min-h-screen w-full flex items-center justify-center bg-gradient-to-b...[0m
+  [90m122 |[0m       <div className=[32m"w-full max-w-sm bg-white/80 backdrop-blur-sm dark:bg-gray-900/80 ro...[0m
+  [90m123 |[0m         <div className=[32m"flex items-center justify-center w-14 h-14 rounded-2xl bg-gradien...[0m
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/login/page.tsx [Client Component Browser]
+    ./src/app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/login/page.tsx [Client Component SSR]
+    ./src/app/login/page.tsx [Server Component]
+
+
+ GET /login?code=fff9e44f-550e-4fd3-a0e5-c69b9e035256 500 in 113ms (next.js: 56ms, proxy.ts: 14ms, application-code: 42ms)
+[browser] Uncaught Error: ./src/app/login/page.tsx:267:1
+Expected '}', got '<eof>'
+  265 |   )
+  266 | }
+> 267 |
+      | ^
+
+Parsing ecmascript source code failed
+
+Import traces:
+  Client Component Browser:
+    ./src/app/login/page.tsx [Client Component Browser]
+    ./src/app/login/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/login/page.tsx [Client Component SSR]
+    ./src/app/login/page.tsx [Server Component]
+
+
+    at <unknown> (Error: ./src/app/login/page.tsx:267:1)
+    at <unknown> (Error: (./src/app/login/page.tsx:267:1)
+✓ Compiled in 307ms
+ GET /login?code=fff9e44f-550e-4fd3-a0e5-c69b9e035256 200 in 1265ms (next.js: 383ms, proxy.ts: 289ms, application-code: 593ms)
