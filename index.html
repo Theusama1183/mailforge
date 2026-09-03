@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Products</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f4f4f4;
+        }
+
+        #products {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .card {
+            width: 220px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, .15);
+        }
+
+        .card img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+        }
+
+        .popup {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .6);
+        }
+
+        .popup-content {
+            width: 400px;
+            background: white;
+            margin: 60px auto;
+            padding: 20px;
+            border-radius: 10px;
+            position: relative;
+        }
+
+        .popup-content img {
+            width: 100%;
+        }
+
+        #close {
+            position: absolute;
+            right: 15px;
+            top: 10px;
+            font-size: 30px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Products</h2>
+    <div id="products"></div>
+    <!-- Popup -->
+    <div id="popup" class="popup">
+        <div class="popup-content">
+            <span id="close">&times;</span>
+            <img id="popupImage">
+            <h2 id="popupTitle"></h2>
+            <h3 id="popupPrice"></h3>
+            <p id="popupDesc"></p>
+        </div>
+    </div>
+    <script>
+        const products = [
+            {
+                name: "Laptop",
+                price: "$1200",
+                description: "Powerful laptop for developers.",
+                image: "https://picsum.photos/300/200?1"
+            },
+            {
+                name: "Phone",
+                price: "$700",
+                description: "Latest Android phone.",
+                image: "https://picsum.photos/300/200?2"
+            },
+            {
+                name: "Headphones",
+                price: "$150",
+                description: "Noise cancelling headphones.",
+                image: "https://picsum.photos/300/200?3"
+            }
+        ];
+
+        const container = document.getElementById("products");
+
+        products.forEach((product) => {
+
+            container.innerHTML += `
+        <div class="card">
+            <img src="${product.image}">
+            <h3>${product.name}</h3>
+            <p>${product.price}</p>
+        </div>
+    `;
+
+        });
+
+        const cards = document.querySelectorAll(".card");
+
+        cards.forEach((card, index) => {
+            card.onclick = () => {
+                const product = products[index];
+                document.getElementById("popupImage").src = product.image;
+                document.getElementById("popupTitle").textContent = product.name;
+                document.getElementById("popupPrice").textContent = product.price;
+                document.getElementById("popupDesc").textContent = product.description;
+                document.getElementById("popup").style.display = "block";
+            };
+
+        });
+
+        document.getElementById("close").onclick = () => {
+            document.getElementById("popup").style.display = "none";
+        };
+
+    </script>
+
+</body>
+
+</html>

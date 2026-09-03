@@ -11,7 +11,6 @@ import {
   Plus, Trash2, Globe, Mail, Loader2, Server, Settings2, RefreshCw, Cloud,
   CheckCircle, XCircle, LogIn, ArrowUpDown, PenLine, Check,
   User, Bell, Plane, Forward, Ban, Users, MailCheck, Lock, Key, Smartphone, Shield, ShieldOff, Network, Fingerprint,
-  CreditCard, ExternalLink, ArrowUp,
 } from "lucide-react"
 import { toast } from "sonner"
 import type { SettingsTab, VacationAutoreply, ForwardingRule, BlockedSender, TrustedSender } from "@/types"
@@ -41,7 +40,6 @@ const TABS: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { id: "blocks", label: "Blocks", icon: <Ban className="h-4 w-4" /> },
   { id: "domains", label: "Domains", icon: <Globe className="h-4 w-4" /> },
   { id: "signatures", label: "Signatures", icon: <PenLine className="h-4 w-4" /> },
-  { id: "billing", label: "Billing", icon: <CreditCard className="h-4 w-4" /> },
   { id: "team", label: "Team", icon: <Users className="h-4 w-4" /> },
 ]
 
@@ -397,7 +395,6 @@ export default function SettingsPage() {
           />
         )}
         {activeTab === "signatures" && <SignaturesSection />}
-        {activeTab === "billing" && <BillingSection workspaceId={workspaceId} />}
         {activeTab === "team" && <TeamSection workspaceId={workspaceId} />}
       </div>
     </div>
@@ -509,24 +506,17 @@ function ProfileSection({ userData, onUpdate }: { userData: any; onUpdate: (d: a
 
 /* ───── Notifications Section ───── */
 function NotificationsSection() {
-  const [prefs, setPrefs] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [emailPrefs, setEmailPrefs] = useState({
+    email_received: true,
+    email_opened: false,
+    email_clicked: false,
+    email_bounced: true,
+    email_failed: true,
+  })
+  const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    fetch("/api/notification-preferences").then(r => r.json()).then(data => {
-      setPrefs(Array.isArray(data) ? data : [])
-      setLoading(false)
-    }).catch(() => setLoading(false))
-  }, [])
-
-  const toggle = async (eventType: string, field: "email_enabled" | "in_app_enabled", value: boolean) => {
-    setPrefs(prev => prev.map(p => p.event_type === eventType ? { ...p, [field]: value } : p))
-    const res = await fetch("/api/notification-preferences", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ event_type: eventType, [field]: value }),
-    })
-    if (!res.ok) toast.error("Failed to update")
+  const toggle = (key: string, value: boolean) => {
+    setEmailPrefs(prev => ({ ...prev, [key]: value }))
   }
 
   const EVENT_LABELS: Record<string, string> = {
@@ -535,29 +525,38 @@ function NotificationsSection() {
     email_clicked: "Link clicked",
     email_bounced: "Email bounced",
     email_failed: "Send failed",
-    member_joined: "Member joined",
-    member_left: "Member left",
   }
 
-  if (loading) return <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      localStorage.setItem("mailforge_notification_prefs", JSON.stringify(emailPrefs))
+      toast.success("Notification preferences saved")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="max-w-lg space-y-4">
-      {prefs.map(p => (
-        <div key={p.event_type} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 dark:bg-gray-900">
-          <span className="text-sm text-gray-900 dark:text-gray-100">{EVENT_LABELS[p.event_type] || p.event_type}</span>
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-1.5 text-xs text-gray-500">
-              <input type="checkbox" checked={p.email_enabled} onChange={e => toggle(p.event_type, "email_enabled", e.target.checked)} className="rounded border-gray-300" />
-              Email
-            </label>
-            <label className="flex items-center gap-1.5 text-xs text-gray-500">
-              <input type="checkbox" checked={p.in_app_enabled} onChange={e => toggle(p.event_type, "in_app_enabled", e.target.checked)} className="rounded border-gray-300" />
-              In-app
-            </label>
-          </div>
+      {Object.keys(emailPrefs).map(key => (
+        <div key={key} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 dark:bg-gray-900">
+          <span className="text-sm text-gray-900 dark:text-gray-100">{EVENT_LABELS[key] || key}</span>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={emailPrefs[key as keyof typeof emailPrefs]}
+              onChange={e => toggle(key, e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500/20 cursor-pointer"
+            />
+            <span className="text-xs text-gray-500">Email</span>
+          </label>
         </div>
       ))}
+      <Button onClick={handleSave} disabled={saving} className="gap-2">
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+        Save Preferences
+      </Button>
     </div>
   )
 }
@@ -1755,242 +1754,6 @@ function TeamSection({ workspaceId }: { workspaceId?: string }) {
           ))}
           {activityLogs.length === 0 && <p className="text-sm text-gray-400">No activity logs</p>}
         </div>
-      )}
-    </div>
-  )
-}
-
-/* ───── Billing Section ───── */
-function BillingSection({ workspaceId }: { workspaceId?: string }) {
-  const [subscription, setSubscription] = useState<any>(null)
-  const [currentPlan, setCurrentPlan] = useState<any>(null)
-  const [invoices, setInvoices] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadingAction, setLoadingAction] = useState<string | null>(null)
-
-  const PLANS = [
-    { code: "free", name: "Free", price: "$0", features: ["100 emails/day", "500 MB storage", "1 domain", "1 team member"] },
-    { code: "pro", name: "Pro", price: "$19.99/mo", yearlyPrice: "$199.90/yr", features: ["10,000 emails/day", "5 GB storage", "5 domains", "5 team members", "Custom templates", "A/B testing", "IMAP sync"] },
-    { code: "business", name: "Business", price: "$49.99/mo", yearlyPrice: "$499.90/yr", features: ["50,000 emails/day", "20 GB storage", "25 domains", "25 team members", "Custom templates", "A/B testing", "IMAP sync", "Priority support"] },
-    { code: "enterprise", name: "Enterprise", price: "Custom", features: ["Unlimited emails", "100 GB storage", "Unlimited domains", "Unlimited team members", "Everything included", "Dedicated support"] },
-  ]
-
-  useEffect(() => {
-    if (!workspaceId) return
-    Promise.all([
-      fetch(`/api/billing/subscription?workspace_id=${workspaceId}`).then(r => r.json()),
-      fetch(`/api/billing/invoices?workspace_id=${workspaceId}`).then(r => r.json()),
-    ]).then(([subData, invData]) => {
-      setSubscription(subData.subscription || null)
-      setCurrentPlan(subData.currentPlan || null)
-      setInvoices(invData.invoices || [])
-      setLoading(false)
-    }).catch(() => setLoading(false))
-  }, [workspaceId])
-
-  const handleCheckout = async (planCode: string, interval: string) => {
-    if (!workspaceId) return
-    setLoadingAction(`${planCode}-${interval}`)
-    try {
-      const res = await fetch("/api/billing/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          planCode,
-          billingInterval: interval,
-          workspaceId,
-          returnUrl: window.location.href,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl
-      } else if (data.transactionId && typeof window.Paddle !== "undefined") {
-        window.Paddle.Checkout.open({ transactionId: data.transactionId })
-      } else {
-        toast.error("Checkout failed — Paddle not initialized")
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Checkout failed")
-    } finally {
-      setLoadingAction(null)
-    }
-  }
-
-  const handleCustomerPortal = async () => {
-    if (!workspaceId) return
-    setLoadingAction("portal")
-    try {
-      const res = await fetch("/api/billing/customer-portal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspaceId }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      if (data.url) {
-        window.open(data.url, "_blank")
-      } else {
-        toast.error("No portal URL returned")
-      }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to open portal")
-    } finally {
-      setLoadingAction(null)
-    }
-  }
-
-  if (loading) return <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-
-  const isSubscribed = subscription?.paddle_subscription_id
-
-  return (
-    <div className="space-y-8">
-      {/* Current Plan */}
-      <section className="space-y-4">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-          <CreditCard className="h-4 w-4 text-blue-500" />
-          Current Plan
-        </h3>
-
-        <div className="rounded-xl border border-gray-200 dark:border-gray-700 dark:bg-gray-900 p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {currentPlan?.name || "Free"}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {isSubscribed
-                  ? `${subscription.billing_interval === "yearly" ? "Yearly" : "Monthly"} billing`
-                  : "Free plan — no subscription"}
-              </p>
-              {subscription?.current_period_end && (
-                <p className="text-xs text-gray-400 mt-1">
-                  Renews {new Date(subscription.current_period_end).toLocaleDateString()}
-                </p>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {isSubscribed ? (
-                <Button size="sm" variant="outline" onClick={handleCustomerPortal} disabled={loadingAction === "portal"} className="gap-2">
-                  {loadingAction === "portal" ? <Loader2 className="h-3 w-3 animate-spin" /> : <ExternalLink className="h-3 w-3" />}
-                  Manage
-                </Button>
-              ) : (
-                <Button size="sm" className="gap-2">
-                  <ArrowUp className="h-3 w-3" />
-                  Upgrade
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Plan Comparison */}
-      <section className="space-y-4">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Available Plans</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {PLANS.filter(p => p.code !== (isSubscribed ? currentPlan?.code : "enterprise")).map(plan => {
-            const isCurrent = plan.code === currentPlan?.code && isSubscribed
-            const isFree = plan.code === "free"
-            const isEnterprise = plan.code === "enterprise"
-            return (
-              <div
-                key={plan.code}
-                className={`rounded-xl border p-5 flex flex-col ${
-                  isCurrent
-                    ? "border-blue-300 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-950/20"
-                    : "border-gray-200 dark:border-gray-700 dark:bg-gray-900"
-                }`}
-              >
-                <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{plan.name}</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-1">{plan.price}</p>
-                {plan.yearlyPrice && <p className="text-xs text-gray-400">{plan.yearlyPrice}</p>}
-                <ul className="mt-4 space-y-2 flex-1">
-                  {plan.features.map((f, i) => (
-                    <li key={i} className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
-                      <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                {isCurrent ? (
-                  <Button size="sm" variant="outline" disabled className="mt-4 w-full">Current Plan</Button>
-                ) : isFree ? (
-                  <Button size="sm" variant="outline" onClick={async () => {
-                    if (!workspaceId || !subscription?.paddle_subscription_id) return
-                    setLoadingAction("cancel")
-                    try {
-                      const res = await fetch("/api/billing/cancel", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ workspaceId }),
-                      })
-                      const data = await res.json()
-                      if (!res.ok) throw new Error(data.error || "Cancel failed")
-                      toast.success("Subscription canceled")
-                      setTimeout(() => window.location.reload(), 1000)
-                    } catch (err) {
-                      toast.error(err instanceof Error ? err.message : "Cancel failed — use Manage button to cancel in Paddle portal")
-                    } finally {
-                      setLoadingAction(null)
-                    }
-                  }} disabled={loadingAction === "cancel"} className="mt-4 w-full gap-2">
-                    {loadingAction === "cancel" ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-                    Downgrade to Free
-                  </Button>
-                ) : isEnterprise ? (
-                  <Button size="sm" variant="outline" onClick={() => window.open("https://paddle.com/contact", "_blank")} className="mt-4 w-full gap-2">
-                    <ExternalLink className="h-3 w-3" />
-                    Contact Us
-                  </Button>
-                ) : (
-                  <div className="mt-4 space-y-2">
-                    <Button size="sm" onClick={() => handleCheckout(plan.code, "monthly")} disabled={loadingAction === `${plan.code}-monthly`} className="w-full gap-2">
-                      {loadingAction === `${plan.code}-monthly` ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-                      Subscribe Monthly
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleCheckout(plan.code, "yearly")} disabled={loadingAction === `${plan.code}-yearly`} className="w-full gap-2">
-                      {loadingAction === `${plan.code}-yearly` ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-                      Subscribe Yearly (Save ~17%)
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      </section>
-
-      {/* Invoice History */}
-      {invoices.length > 0 && (
-        <section className="space-y-4">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Invoices</h3>
-          <div className="space-y-2">
-            {invoices.map((inv: any) => (
-              <div key={inv.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-gray-700 dark:bg-gray-900">
-                <div>
-                  <p className="text-sm text-gray-900 dark:text-gray-100">
-                    {(inv.amount / 100).toFixed(2)} {inv.currency?.toUpperCase() || "USD"}
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    {new Date(inv.created_at).toLocaleDateString()} · {inv.billing_reason?.replace(/_/g, " ")}
-                  </p>
-                </div>
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                  inv.status === "paid" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
-                  inv.status === "pending" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
-                  "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                }`}>
-                  {inv.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
       )}
     </div>
   )

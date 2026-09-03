@@ -4,6 +4,7 @@ import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 import { autoSaveContacts } from "@/lib/contacts"
 import { validateRequestBody, sendEmailSchema } from "@/lib/validation"
 import { withErrorHandling, RateLimitError, ValidationError, logAuditEvent } from "@/lib/error-handling"
+import { sendEmail } from "@/lib/send"
 
 export const POST = withErrorHandling(async (req: Request) => {
   // Validate input first
@@ -133,9 +134,7 @@ export const POST = withErrorHandling(async (req: Request) => {
     encoding: "base64" as const,
   }))
 
-  const scheduledFor = new Date(Date.now() + 10000).toISOString()
-
-  // Insert email using authenticated client (RLS enforced)
+  // Insert email record first
   const { error: dbError } = await supabase.from("emails").insert({
     id: emailId,
     user_id: userId,
@@ -151,13 +150,57 @@ export const POST = withErrorHandling(async (req: Request) => {
     in_reply_to: inReplyTo || null,
     priority: priority || "normal",
     read_receipt: readReceipt || false,
-    delivery_status: "queued",
-    scheduled_for: scheduledFor,
+    delivery_status: "sending",
   })
 
   if (dbError) {
-    console.error("Failed to queue email:", dbError)
-    throw new Error("Failed to queue email for sending")
+    console.error("Failed to save email:", dbError)
+    throw new Error("Failed to save email")
+  }
+
+  // Send email directly via SMTP/Mailgun
+  try {
+    const result = await sendEmail({
+      smtp: {
+        provider: domain.smtp_provider,
+        host: domain.smtp_host,
+        port: domain.smtp_port,
+        username: domain.smtp_username,
+        password: domain.smtp_password,
+        mailgunApiKey: domain.mailgun_api_key,
+        mailgunDomain: domain.mailgun_domain,
+      },
+      from: sendFrom,
+      to,
+      cc: cc || undefined,
+      bcc: bcc || undefined,
+      subject: subject || "",
+      text: textBody || undefined,
+      html: htmlWithTracking,
+      replyTo: inReplyTo || undefined,
+      attachments: parsedAttachments,
+      priority,
+      readReceipt,
+      listUnsubscribe: unsubscribeUrl,
+    })
+
+    // Update status to sent
+    await supabase
+      .from("emails")
+      .update({
+        delivery_status: "sent",
+        message_id: result.id,
+        delivered_at: new Date().toISOString(),
+      })
+      .eq("id", emailId)
+  } catch (sendError) {
+    console.error("Failed to send email:", sendError)
+    // Update status to failed
+    await supabase
+      .from("emails")
+      .update({ delivery_status: "failed" })
+      .eq("id", emailId)
+    throw new Error(`Failed to send email: ${sendError instanceof Error ? sendError.message : "Unknown error"}`)
   }
 
   // Auto-save contacts if workspace is available

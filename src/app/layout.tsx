@@ -6,8 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { WorkspaceProvider } from "@/components/workspace-provider"
 import { CookieConsentBanner } from "@/components/cookie-consent-banner"
 import { ErrorTrackingProvider } from "@/lib/client-error-tracking"
-import { PwaInstallPrompt } from "@/components/pwa-install-prompt"
-import { PaddleProvider } from "@/components/paddle-provider"
+
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -39,9 +38,7 @@ export default function RootLayout({
             >
               Skip to content
             </a>
-            <PaddleProvider />
             {children}
-            <PwaInstallPrompt />
             <CookieConsentBanner />
             <script
               dangerouslySetInnerHTML={{

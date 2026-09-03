@@ -141,9 +141,9 @@ export default function OnboardingPage() {
                 <div className="w-10 h-10 rounded-lg bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center mb-3">
                   <CreditCard className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                 </div>
-                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Pay as you grow</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-1">Free to use</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                  No subscriptions. Only pay for what you use with transparent, usage-based pricing.
+                  No subscriptions. Use it as much as you want.
                 </p>
               </div>
             </div>

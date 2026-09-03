@@ -433,10 +433,6 @@ export default function TemplatesPage() {
       <PageHeader title="Email Templates" description="Save and reuse email templates"
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => router.push(`/${workspaceId}/marketplace`)} className="gap-2">
-              <ShoppingBag className="h-4 w-4" />
-              Marketplace
-            </Button>
             <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} className="gap-2">
               <Upload className="h-4 w-4" />
               Import

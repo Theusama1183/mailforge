@@ -288,4 +288,4 @@ export interface ActivityLog {
   created_at: string
 }
 
-export type SettingsTab = "profile" | "security" | "notifications" | "vacation" | "forwarding" | "blocks" | "domains" | "signatures" | "billing" | "team"
+export type SettingsTab = "profile" | "security" | "notifications" | "vacation" | "forwarding" | "blocks" | "domains" | "signatures" | "team"

@@ -5,7 +5,7 @@ import { useTheme } from "@/components/theme-provider"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useWorkspace } from "@/components/workspace-provider"
-import { Inbox, Send, Star, Archive, Trash2, FileText, AlertTriangle, Settings, LogOut, Compass, Moon, Sun, TrendingUp, LayoutTemplate, Users, Server, Contact2, ChevronDown, Check, Plus, FolderPlus, Tag, X, Palette, BarChart3, ShoppingBag, Menu } from "lucide-react"
+import { Inbox, Send, Star, Archive, Trash2, FileText, AlertTriangle, Settings, LogOut, SquarePen, Moon, Sun, TrendingUp, LayoutTemplate, Users, Server, Contact2, ChevronDown, Check, FolderPlus, Tag, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -254,7 +254,7 @@ export function Sidebar({
       {/* Compose */}
       <div className="px-3 py-2">
         <Button onClick={onCompose} className="w-full gap-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700 text-white rounded-xl py-5 shadow-sm hover:shadow-md transition-all duration-150">
-          <Compass className="h-4 w-4" /> Compose
+          <SquarePen className="h-4 w-4" /> Compose
         </Button>
       </div>
 
@@ -419,9 +419,7 @@ export function Sidebar({
           {[
             { id: "analytics", label: "Analytics", icon: TrendingUp },
             { id: "templates", label: "Templates", icon: LayoutTemplate },
-            { id: "marketplace", label: "Marketplace", icon: ShoppingBag },
             { id: "contacts", label: "Contacts", icon: Contact2 },
-            { id: "ab-tests", label: "A/B Tests", icon: BarChart3 },
             { id: "imap-sync", label: "IMAP Sync", icon: Server },
             { id: "workspaces", label: "Workspaces", icon: Users },
             { id: "settings", label: "Settings", icon: Settings },

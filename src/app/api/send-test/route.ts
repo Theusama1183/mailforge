@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getAuthUser } from "@/lib/supabase/api-client"
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit"
+import { sendEmail } from "@/lib/send"
 
 export async function POST(req: Request) {
   try {
@@ -33,23 +34,56 @@ export async function POST(req: Request) {
     const testTextBody = textBody ? `[TEST EMAIL - Do not forward]\n\n${textBody}` : ""
 
     const emailId = crypto.randomUUID()
+    const fromAddress = `test@${domain.domain}`
+
+    // Insert email record
     const { error: dbError } = await supabase.from("emails").insert({
       id: emailId,
       user_id: user.id,
-      mailbox_address: `test@${domain.domain}`,
-      from_address: `test@${domain.domain}`,
+      mailbox_address: fromAddress,
+      from_address: fromAddress,
       to_addresses: [to],
       subject: testSubject,
       body_html: testBody,
       body_text: testTextBody,
       direction: "outbound",
       folder: "sent",
-      delivery_status: "queued",
-      scheduled_for: new Date(Date.now() + 5000).toISOString(),
+      delivery_status: "sending",
     })
 
     if (dbError) {
       return NextResponse.json({ error: dbError.message }, { status: 500 })
+    }
+
+    // Send directly
+    try {
+      await sendEmail({
+        smtp: {
+          provider: domain.smtp_provider,
+          host: domain.smtp_host,
+          port: domain.smtp_port,
+          username: domain.smtp_username,
+          password: domain.smtp_password,
+          mailgunApiKey: domain.mailgun_api_key,
+          mailgunDomain: domain.mailgun_domain,
+        },
+        from: fromAddress,
+        to: [to],
+        subject: testSubject,
+        html: testBody,
+        text: testTextBody || undefined,
+      })
+
+      await supabase
+        .from("emails")
+        .update({ delivery_status: "sent", delivered_at: new Date().toISOString() })
+        .eq("id", emailId)
+    } catch (sendError) {
+      await supabase
+        .from("emails")
+        .update({ delivery_status: "failed" })
+        .eq("id", emailId)
+      return NextResponse.json({ error: `Failed to send: ${sendError instanceof Error ? sendError.message : "Unknown error"}` }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, id: emailId, subject: testSubject })

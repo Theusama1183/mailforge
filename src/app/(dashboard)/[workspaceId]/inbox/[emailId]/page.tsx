@@ -194,28 +194,7 @@ export default function EmailDetailPage() {
         const { id } = await res.json()
 
         setShowCompose(false)
-
-        let cancelled = false
-        const timer = setTimeout(async () => {
-          if (!cancelled) {
-            try {
-              await fetch(`/api/send/confirm/${id}`, { method: "POST" })
-            } catch {}
-          }
-        }, 10000)
-
-        toast("Message sent", {
-          description: "Undo available (10s)",
-          action: {
-            label: "Undo",
-            onClick: async () => {
-              cancelled = true
-              clearTimeout(timer)
-              await fetch(`/api/send/cancel/${id}`, { method: "DELETE" })
-              toast("Message unsent")
-            },
-          },
-        })
+        toast.success("Email sent successfully")
       } catch (err) {
         console.error("Error sending:", err)
         toast.error("Failed to send email")

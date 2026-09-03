@@ -3,36 +3,6 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { autoSaveContacts } from "@/lib/contacts"
 import crypto from "crypto"
 
-async function sendPushNotifications(userIds: string[], subject: string, fromAddress: string) {
-  try {
-    const supabase = createAdminClient()
-    const { data: tokens } = await supabase
-      .from("push_tokens")
-      .select("token, platform")
-      .in("user_id", userIds)
-
-    if (!tokens || tokens.length === 0) return
-
-    const messages = tokens.map((t: { token: string; platform: string }) => ({
-      to: t.token,
-      title: fromAddress,
-      body: subject?.slice(0, 100) || "New email",
-      sound: "default",
-      badge: 1,
-      data: { type: "new_email", from: fromAddress, subject },
-    }))
-
-    // Send via Expo Push API
-    await fetch("https://exp.host/--/api/v2/push/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(messages),
-    })
-  } catch (err) {
-    console.error("Push notification error:", err)
-  }
-}
-
 export async function POST(req: Request) {
   const requestId = crypto.randomUUID?.() || Date.now().toString(36)
 
@@ -128,9 +98,6 @@ export async function POST(req: Request) {
     for (const uid of userIds) {
       if (incomingWorkspaceId) autoSaveContacts(supabase, uid, incomingWorkspaceId, [fromAddress])
     }
-
-    // Send push notifications
-    await sendPushNotifications(userIds, subject || "", fromAddress)
 
     return NextResponse.json({ success: true })
   } catch (error) {

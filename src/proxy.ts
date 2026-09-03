@@ -6,7 +6,7 @@ const FLAT_ROUTES = ["/inbox", "/analytics", "/templates", "/imap-sync", "/setti
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Skip auth check for webhook (called by Cloudflare Worker without cookies)
+  // Skip auth check for webhooks (called without cookies)
   if (pathname.startsWith("/api/webhook")) {
     return NextResponse.next()
   }

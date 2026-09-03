@@ -4,12 +4,11 @@ import { NextResponse, type NextRequest } from "next/server"
 function addSecurityHeaders(response: NextResponse): void {
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.paddle.com https://*.paddle.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://*.paddle.com",
+    "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.supabase.co https://*.paddle.com",
-    "frame-src 'self' https://*.paddle.com",
+    "connect-src 'self' https://*.supabase.co",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
